@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Web Bluetooth demo (Edison)</title>
+    <script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+    <link rel="import" href="bower_components/polymer/polymer.html">
+    <link rel="import" href="bower_components/paper-button/paper-button.html">
+    <link rel="import" href="bower_components/paper-input/paper-input.html">
+    <link rel="import" href="bower_components/paper-spinner/paper-spinner.html">
+    <link rel="import" href="bower_components/iron-list/iron-list.html">
+    <link rel="import" href="bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+    <meta name="viewport" content="width=device-width">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FF4081">
+    <style>
+      body {
+        margin: 0px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+
+  <dom-module id="main-app">
+  <template>
+    <style is="custom-style" include="iron-flex iron-flex-alignment">
+      :host {
+        display: block;
+        box-sizing: border-box;
+        height: 100vh;
+        width: 100vw;
+        background-color: #fafafa;
+        @apply(--paper-font-body1);
+        @apply(--vertical-layout);
+      }
+
+      .messages {
+        flex: 1 1;
+        overflow-y: scroll;
+        word-wrap: break-word;
+        -webkit-user-select: text;
+        border-top: 1px solid rgb(230, 230, 230);
+        -webkit-transform: translateZ(0);
+      }
+
+      .consoleLine {
+        padding: 1px 22px 1px 24px;
+        border-top: 1px solid rgb(230, 230, 230);
+        min-height: 20px;
+        line-height: 20px;
+        flex: auto;
+        font-family: monospace;
+        font-size: 8pt;
+      }
+      .consoleLine:first-of-type {
+        border-top: none !important;
+      }
+
+      .error:last-child {
+        border-bottom: 1px solid #ffd7d7;
+      }
+      .log:last-child {
+        border-bottom: 1px solid rgb(230, 230, 230);
+      }
+      .error + :not(.error) {
+        border-top: 1px solid #ffd7d7;
+      }
+      .error {
+        background-color: #fff0f0;
+        border-top: 1px solid #ffd7d7 !important;
+        color: red !important;
+      }
+      .log {
+        background-color: white;
+      }
+
+      #temperature {
+        @apply(--paper-font-title);
+      }
+
+      #temperature span {
+        color: #FF4081;
+      }
+
+      #update {
+        color: #727272;
+      }
+
+      paper-button {
+        background-color: #303F9F;
+        color: white;
+      }
+
+      .clearBtn {
+        position: relative;
+        @apply(--layout-horizontal);
+        @apply(--layout-end-justified);
+      }
+
+      .clearBtn paper-button {
+        background-color: transparent;
+        color: black;
+        height: 52px;
+      }
+
+      connectBtn {
+        background-color: white;
+      }
+
+      .centered {
+        margin: 10px;
+        @apply(--layout-fit);
+        @apply(--layout-horizontal);
+        @apply(--layout-center-justified);
+      }
+
+      #main {
+        overflow: scroll;
+        -webkit-overflow-scrolling: touch;
+        height: calc(100vh - 60px);
+      }
+
+      #panel {
+        padding: 10px;
+        border-top: 1px solid rgb(230, 230, 230);
+        background-color: #303F9F;
+        @apply(--layout-horizontal);
+        @apply(--layout-end-justified);
+      }
+
+    </style>
+      <div id="main">
+        <div style="margin: 10px;">
+           Web Bluetooth (Intel&reg; Edison) demo
+          <br></br>
+          <div id="temperature">
+            Temperature is <span id="temp">20</span>&deg; celcius
+          </div>
+          <div id="update">(not updated yet)</div>
+          <br></br>
+          <paper-input label="LED color" placeholder="Type color name here" id="color" class="flex"></paper-input>
+          <div class="horizontal layout end-justified">
+            <paper-button id="submit" on-click="writeLedColor">Submit</paper-button>
+          </div>
+        </div>
+        <br></br>
+        <div id="console" class="flex">
+          <iron-list class="messages" items="[[consoleLines]]" as="item">
+            <template>
+              <div class$="consoleLine [[item.type]]">
+                [[item.value]]
+              </div>
+            </template>
+          </iron-list>
+          <div class="clearBtn">
+            <div class="centered">
+              <paper-spinner id="spinner"></paper-spinner>
+            </div>
+            <template is="dom-if" if="[[consoleLines.length]]">
+              <paper-button on-click="clear" noink>Clear</paper-button>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div id="panel">
+        <paper-button id="connectBtn" on-click="onConnectBtnClick">[[buttonTitle]]</paper-button>
+      </div>
+  </template>
+
+  <script>
+    (function() {
+      'use strict';
+
+      Polymer({
+        is: 'main-app',
+        properties: {
+          server: {
+            type: Object,
+            notify: true,
+            value: false
+          },
+          colorLedCharacteristic: {
+            type: Object,
+            value: null
+          },
+          temperatureCharacteristic: {
+            type: Object,
+            value: null
+          },
+          buttonTitle: {
+            type: String,
+            computed: 'computeButtonTitle(server)'
+          },
+          consoleLines: {
+            type: Array,
+            notify: true,
+            value: function() {
+              return [];
+            }
+          }
+        },
+        computeButtonTitle: function(server) {
+          return server ? "Disconnect" : "Connect";
+        },
+        log: function(text) {
+          this.push('consoleLines', { value: text, type: "log"});
+        },
+        error: function(text) {
+          this.push('consoleLines', { value: text, type: "error"});
+        },
+        clear: function() {
+          this.consoleLines = [];
+        },
+        readLedColor: function() {
+          return this.colorLedCharacteristic.readValue()
+          .then(function(data) {
+             data = data.buffer ? data : new DataView(data);
+             let decoder = new TextDecoder("utf-8");
+             let decodedString = decoder.decode(data);
+             document.querySelector('#color').value = decodedString;
+           });
+        },
+        writeLedColor: function() {
+          this.$.submit.style.backgroundColor = "#646FB7";
+
+          let done = () => {
+            this.$.submit.style.backgroundColor = "#303F9F";
+          }
+
+          if (!this.colorLedCharacteristic) {
+            this.error("Error: No Color Characteristic found.")
+            return done();
+          }
+
+          let encoder = new TextEncoder("utf-8");
+          let value = document.querySelector('#color').value;
+          let encodedString = encoder.encode(value.toLowerCase());
+
+          return this.colorLedCharacteristic.writeValue(encodedString)
+          .catch(err => { this.error(err); })
+          .then(done);
+        },
+        onTemperatureChange: function(event) {
+          let data = event.target.value;
+          // In Chrome 50+, a DataView is returned instead of an ArrayBuffer.
+          data = data.buffer ? data : new DataView(data);
+          let temperature = data.getFloat64(0, /*littleEndian=*/ true);
+          document.querySelector('#temp').innerHTML = temperature.toFixed(0);
+
+          let date = (new Date()).toString().replace(/^.* (\d+:\d+:\d+).*$/, (match, p) => p);
+          document.querySelector('#update').innerHTML = `(Last Updated: ${date})`;
+        },
+        onConnectBtnClick() {
+          if (this.server) {
+            this.server.disconnect();
+            // .disconnect() currently doesn't result in firing
+            // 'gattserverdisconnected', so duplicate the work here.
+            this.server = null;
+            this.$.spinner.active = false;
+          } else
+            this.connect();
+        },
+        connect: function() {
+          this.clear();
+          this.$.spinner.active = true;
+
+          this.log("Requesting device...");
+
+          this.$.connectBtn.disabled = true;
+          navigator.bluetooth.requestDevice({
+            filters: [{ name: 'Edison' }],
+            optionalServices: [0xFC00]
+          })
+          .then(device => {
+            this.$.connectBtn.disabled = false;
+            this.log("Connecting to GATT server...");
+
+            if (device.addEventListener) {
+              device.addEventListener('gattserverdisconnected', () => {
+                this.server = null;
+                this.$.spinner.active = false;
+              });
+            }
+
+            return device.gatt ? device.gatt.connect() : device.connectGATT();
+          })
+          .then(server => {
+            this.server = server;
+            this.log("Connection established.");
+            return new Promise(resolve => {
+              this.async(() => {
+                this.log("Requesting primary service...");
+                resolve(server.getPrimaryService(0xFC00));
+              }, 2000);
+            });
+          })
+          .then(service => {
+            this.log("Requesting characteristics...");
+
+            let p1 = () => service.getCharacteristic(0xFC0B)
+              .then(characteristic => {
+                this.log("Got Color characteristics.");
+                this.colorLedCharacteristic = characteristic;
+                return this.readLedColor();
+              });
+
+            let p2 = () => service.getCharacteristic(0xFC0A)
+              .then(characteristic => {
+                this.log("Got Temperature characteristics.")
+                characteristic.addEventListener('characteristicvaluechanged',
+                  this.onTemperatureChange);
+                this.log("Attempting to start Temperature notifications...");
+                return characteristic.startNotifications();
+              });
+
+            return p1().then(p2);
+          })
+          .catch(err => {
+            this.error(err);
+            this.server = null;
+            // Work around desktop click on disconnect, triggering error
+            // and enabling to connect with the same click.
+            this.async(() => {
+              this.$.connectBtn.disabled = false;
+            }, 500);
+          })
+          .then(() => {
+            this.log("Connection fully established.");
+            this.$.spinner.active = false;
+          });
+        },
+        ready: function() {
+          document.querySelector('#color').addEventListener('keydown', ev => {
+            if (ev.keyCode === 13)
+              this.writeLedColor();
+          });
+        }
+      });
+    })();
+  </script>
+</dom-module>
+
+  <body unresolved fullbleed>
+    <main-app></main-app>
+  </body>
+</html>

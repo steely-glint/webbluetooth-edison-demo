@@ -1,0 +1,26 @@
+{
+  "name": "edison-webbluetooth-demo",
+  "homepage": "https://github.com/01org/edison-webbluetooth-demo",
+  "authors": [
+    "Kenneth Rohde Christiansen <kenneth.r.christiansen@intel.com>"
+  ],
+  "description": "",
+  "main": "",
+  "moduleType": [],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "polymer": "Polymer/polymer#~1.3.0",
+    "paper-button": "polymerelements/paper-button#~1.0.11",
+    "paper-input": "polymerelements/paper-input#~1.1.8",
+    "iron-flex-layout": "polymerelements/iron-flex-layout#~1.3.0",
+    "iron-list": "polymerelements/iron-list#~1.2.7",
+    "paper-spinner": "polymerelements/paper-spinner#~1.1.1"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "WebBluetooth Edison Demo",
+  "short_name": "WebBT Edison",
+  "start_url": "/",
+  "background_color": "#303F9F",
+  "display": "standalone",
+  "theme_color": "#FF4081"
+}

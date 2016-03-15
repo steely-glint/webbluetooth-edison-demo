@@ -1,0 +1,14 @@
+{
+  "name": "webbluetooth-edison-demo-server",
+  "description": "",
+  "version": "1.0.0",
+  "main": "main.js",
+  "engines": {
+    "node": ">=0.10.0"
+  },
+  "dependencies": {
+    "eddystone-beacon": "^1.0.5",
+    "johnny-five": "^0.9.30",
+    "parse-color": "^1.0.0"
+  }
+}
