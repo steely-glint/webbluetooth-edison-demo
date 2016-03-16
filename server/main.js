@@ -19,7 +19,7 @@ var TemperatureCharacteristic = function() {
     properties: ['read', 'notify'],
     value: null
   });
-    
+
   this._lastValue = 0;
   this._total = 0;
   this._samples = 0;
@@ -48,30 +48,32 @@ TemperatureCharacteristic.prototype.onUnsubscribe = function() {
 var NO_SAMPLES = 100;
 
 TemperatureCharacteristic.prototype.valueChange = function(value) {
-    this._total += value;
-    this._samples++;
-    
-    if (this._samples < NO_SAMPLES)
-        return;
-        
-    var newValue = Math.round(this._total / NO_SAMPLES);
-    
-    this._total = 0;
-    this._samples = 0;
-    
-    if (this._lastValue && Math.abs(this._lastValue - newValue) < 1)
-        return;
-    
-    this._lastValue = newValue;
-    
-    console.log(newValue);
-    var data = new Buffer(8);
-    data.writeDoubleLE(newValue, 0);
-    
-    if (this._onChange)
-      this._onChange(data);
-};
+  this._total += value;
+  this._samples++;
 
+  if (this._samples < NO_SAMPLES) {
+    return;
+  }
+
+  var newValue = Math.round(this._total / NO_SAMPLES);
+
+  this._total = 0;
+  this._samples = 0;
+
+  if (this._lastValue && Math.abs(this._lastValue - newValue) < 1) {
+    return;
+  }
+
+  this._lastValue = newValue;
+  console.log("Temperature change " + newValue);
+
+  var data = new Buffer(8);
+  data.writeDoubleLE(newValue, 0);
+
+  if (this._onChange) {
+    this._onChange(data);
+  }
+};
 
 var ColorCharacteristic = function() {
   bleno.Characteristic.call(this, {
@@ -96,23 +98,23 @@ ColorCharacteristic.prototype.onWriteRequest = function(data, offset, withoutRes
     callback(this.RESULT_SUCCESS);
     return;
   }
-    
+
   this._value = value;
   console.log(value);
 
-  if (this._led)
-      this._led.color(this._value);
+  if (this._led) {
+    this._led.color(this._value);
+  }
   callback(this.RESULT_SUCCESS);
 };
 
 bleno.on('stateChange', function(state) {
   console.log(state);
-    
+
   if (state === 'poweredOn') {
     bleno.startAdvertising(DEVICE_NAME, ['fc00']);
     beacon.advertiseUrl("https://goo.gl/9FomQC", {name: DEVICE_NAME});
-  }   
-  else {
+  } else {
     if (state === 'unsupported'){
       console.log("BLE and Bleno configurations not enabled on board");
     }
@@ -124,36 +126,38 @@ var temperatureCharacteristic = new TemperatureCharacteristic();
 var colorCharacteristic = new ColorCharacteristic();
 
 bleno.on('advertisingStart', function(error) {
-    console.log('advertisingStart: ' + (error ? error : 'success'));
-    
-    if (error)
-        return;
-    
-    bleno.setServices([
-      new bleno.PrimaryService({
-        uuid: 'fc00',
-        characteristics: [
-          temperatureCharacteristic, colorCharacteristic
-        ]
-      })
-    ]);
+  console.log('advertisingStart: ' + (error ? error : 'success'));
+
+  if (error) {
+    return;
+  }
+
+  bleno.setServices([
+    new bleno.PrimaryService({
+      uuid: 'fc00',
+      characteristics: [
+        temperatureCharacteristic,
+        colorCharacteristic
+      ]
+    })
+  ]);
 });
 
 bleno.on('accept', function(clientAddress) {
-    console.log("Accepted Connection: " + clientAddress);
+  console.log("Accepted Connection: " + clientAddress);
 });
 
 bleno.on('disconnect', function(clientAddress) {
-    console.log("Disconnected Connection: " + clientAddress);
+  console.log("Disconnected Connection: " + clientAddress);
 });
 
 board.on("ready", function() {
   var led = new five.Led.RGB({
-      pins: {
-          red: 3,
-          green: 5,
-          blue: 6
-      },
+    pins: {
+      red: 3,
+      green: 5,
+      blue: 6
+    },
   });
 
   board.analogRead("A0", function(raw) {
@@ -161,12 +165,8 @@ board.on("ready", function() {
     var value = (mV / 10) - 50;
     temperatureCharacteristic.valueChange(value);
   });
-    
+
   colorCharacteristic._led = led;
   led.color(colorCharacteristic._value);
   led.intensity(30);
-
-  this.wait(12000, function() {
-    //led.off();
-  });
 });

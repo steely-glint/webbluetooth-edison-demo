@@ -202,10 +202,10 @@
           return server ? "Disconnect" : "Connect";
         },
         log: function(text) {
-          this.push('consoleLines', { value: text, type: "log"});
+          this.push('consoleLines', { value: text, type: "log" });
         },
         error: function(text) {
-          this.push('consoleLines', { value: text, type: "error"});
+          this.push('consoleLines', { value: text, type: "error" });
         },
         clear: function() {
           this.consoleLines = [];
@@ -256,8 +256,9 @@
             // 'gattserverdisconnected', so duplicate the work here.
             this.server = null;
             this.$.spinner.active = false;
-          } else
+          } else {
             this.connect();
+          }
         },
         connect: function() {
           this.clear();
@@ -314,6 +315,9 @@
 
             return p1().then(p2);
           })
+          .then(() => {
+            this.log("Connection fully established.");
+          })
           .catch(err => {
             this.error(err);
             this.server = null;
@@ -324,7 +328,6 @@
             }, 500);
           })
           .then(() => {
-            this.log("Connection fully established.");
             this.$.spinner.active = false;
           });
         },
