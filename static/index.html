@@ -7,8 +7,11 @@
     <link rel="import" href="bower_components/paper-button/paper-button.html">
     <link rel="import" href="bower_components/paper-input/paper-input.html">
     <link rel="import" href="bower_components/paper-spinner/paper-spinner.html">
+    <link rel="import" href="bower_components/paper-toast/paper-toast.html">
     <link rel="import" href="bower_components/iron-list/iron-list.html">
     <link rel="import" href="bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+    <link rel="import" href="bower_components/platinum-sw/platinum-sw-cache.html">
+    <link rel="import" href="bower_components/platinum-sw/platinum-sw-register.html">
     <meta name="viewport" content="width=device-width">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#FF4081">
@@ -169,6 +172,16 @@
   <script>
     (function() {
       'use strict';
+
+      window.onload = () => {
+        var app = document.querySelector('#app');
+
+        app.displayInstalledToast = function() {
+          if (!document.querySelector('platinum-sw-cache').disabled) {
+            document.querySelector('#caching-complete').show();
+          }
+        };
+      }
 
       Polymer({
         is: 'main-app',
@@ -344,5 +357,19 @@
 
   <body unresolved fullbleed>
     <main-app></main-app>
+
+    <template is="dom-bind" id="app">
+      <paper-toast id="caching-complete"
+          duration="6000"
+          text="This app will work offline.">
+      </paper-toast>
+      <platinum-sw-register auto-register
+          on-service-worker-installed="displayInstalledToast">
+        <platinum-sw-cache
+            default-cache-strategy="fastest"
+             cache-config-file="cache-config.json"
+        ></platinum-sw-cache>
+      </platinum-sw-register>
+    </template>
   </body>
 </html>

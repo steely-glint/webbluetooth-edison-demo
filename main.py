@@ -28,6 +28,7 @@ import http2push as http2
 
 class MainHandler(http2.PushHandler):
 
+  @http2.push('static/push_manifest.json')
   def get(self):
     path = os.path.join(os.path.dirname(__file__), 'static/index.html')
     return self.response.write(template.render(path, {}))
