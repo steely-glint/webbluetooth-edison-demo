@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "eddystone-beacon": "^1.0.5",
-    "johnny-five": "^0.9.30",
+    "johnny-five": "^0.9.35",
+    "edison-io": "^0.9.4",
     "parse-color": "^1.0.0"
   }
 }

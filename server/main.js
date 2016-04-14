@@ -157,10 +157,18 @@ board.on("ready", function() {
   // Reference: http://johnny-five.io/api/led.rgb/#parameters
   var led = new five.Led.RGB([ 3, 5, 6 ]);
 
-  board.analogRead("A0", function(raw) {
-    var mV = 5 * 1000 * (raw / 1024);
-    var value = (mV / 10) - 50;
-    temperatureCharacteristic.valueChange(value);
+  // Johnny-Five's Thermometer class provides a built-in
+  // controller definition for the TMP36 sensor. The controller
+  // handles computing a celsius (also fahrenheit & kelvin) from
+  // a raw analog input value.
+  // Reference: http://johnny-five.io/api/thermometer/
+  var temp = new five.Thermometer({
+    controller: "TMP36",
+    pin: "A0",
+  });
+
+  temp.on("change", function() {
+    temperatureCharacteristic.valueChange(this.celsius);
   });
 
   colorCharacteristic._led = led;
