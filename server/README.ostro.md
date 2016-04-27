@@ -42,6 +42,23 @@ cd webbluetooth-edison-demo/server
 npm install
 ```
 
+##Enable Bluetooth##
+
+First we enable Bluetooth via *connman* and set up the ```hci0``` interface
+```
+connmanctl enable bluetooth
+rfkill unblock bluetooth
+hciconfig hci0 up
+```
+
+Now verify that the ```hci0``` interface is up and working:
+
+```
+hcitool scan
+```
+
+Now reboot the device.
+
 ##Install the service##
 
 When the service has been installed, it will automatically launch at boot time.
@@ -54,3 +71,6 @@ cp webbluetooth-edison-demo.service /lib/systemd/system
 systemctl enable webbluetooth-edison-demo.service
 systemctl start webbluetooth-edison-demo.service
 ```
+
+The service should now start automatically everytime the device is powered on.
+Reboot in order to make sure this is the case.
