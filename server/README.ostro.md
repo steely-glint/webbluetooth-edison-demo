@@ -5,7 +5,24 @@
 The following guide assumes that the device has been flashed with
 [Ostro OS](https://ostroproject.org).
 
-The below has been verified to work with image **2016-04-13_04-08-19-build-222**
+Nightly builds (all | dev) can be found
+[here](https://download.ostroproject.org/builds/ostro-os/2016-04-25_13-31-11-build-432/images/edison/).
+This guide has been verified to work with image **2016-04-13_04-08-19-build-222**
+
+You can check your version with the following command:
+
+```
+cat /etc/os-release
+```
+
+You can flash your device using the following instructions:
+
+```
+bunzip <ostro image.toflash.tar.bz2>
+tar xvf <ostro image.toflash.tar>
+cd toFlash/
+sudo ./flashall.sh
+```
 
 ##Set up a WIFI connection##
 
