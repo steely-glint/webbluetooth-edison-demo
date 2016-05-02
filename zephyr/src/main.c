@@ -1,94 +1,134 @@
-#include <zephyr.h>
-#include <device.h>
-#include <pwm.h>
-#include <sys_clock.h>
-#include <misc/byteorder.h>
-#include <adc.h>
-
-#if defined(CONFIG_STDOUT_CONSOLE)
-#include <stdio.h>
-#define PRINT           printf
-#else
-#include <misc/printk.h>
-#define PRINT           printk
-#endif
-
-#define IO3_RED   "PWM_0"
-#define IO5_GREEN "PWM_1"
-#define IO6_BLUE  "PWM_2"
-
-#define ADC_DEVICE_NAME "ADC_0"
+/* main.c - Application main entry point */
 
 /*
- * The analog input pin and channel number mapping
- * for Arduino 101 board.
- * A0 Channel 10
- * A1 Channel 11
- * A2 Channel 12
- * A3 Channel 13
- * A4 Channel 14
+ * Copyright (c) 2015 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-#define A0 10
-#define BUFFER_SIZE 40
 
-static uint8_t buffer[BUFFER_SIZE];
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
+#include <errno.h>
+#include <misc/printk.h>
+#include <misc/byteorder.h>
+#include <zephyr.h>
 
-static struct adc_seq_entry sample = {
-	.sampling_delay = 12,
-	.channel_id = A0,
-	.buffer = buffer,
-	.buffer_length = BUFFER_SIZE,
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/hci.h>
+#include <bluetooth/conn.h>
+#include <bluetooth/uuid.h>
+#include <bluetooth/gatt.h>
+
+#include "service.h"
+
+#define DEVICE_NAME			"Arduino101"
+#define DEVICE_NAME_LEN		(sizeof(DEVICE_NAME) - 1)
+
+struct bt_conn *default_conn;
+
+static const struct bt_data ad[] = {
+	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+	BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0x00, 0xfc),
 };
 
-static struct adc_seq_table table = {
-	.entries = &sample,
-	.num_entries = 1,
+static const struct bt_data sd[] = {
+	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
 };
 
-#define SLEEPTICKS  SECONDS(1)
-
-void main(void)
+static void connected(struct bt_conn *conn, uint8_t err)
 {
-  struct nano_timer timer;
-	uint32_t data[2] = {0, 0};
+	if (err) {
+		printk("Connection failed (err %u)\n", err);
+	} else {
+		default_conn = bt_conn_ref(conn);
+		printk("Connected\n");
+	}
+}
 
-  struct device *red, *green, *blue, *tmp36;
+static void disconnected(struct bt_conn *conn, uint8_t reason)
+{
+	printk("Disconnected (reason %u)\n", reason);
 
-  PRINT("Zephyr WebBluetooth demo\n");
+	if (default_conn) {
+		bt_conn_unref(default_conn);
+		default_conn = NULL;
+	}
+}
 
-  red = device_get_binding(IO3_RED);
-  green = device_get_binding(IO5_GREEN);
-  blue = device_get_binding(IO6_BLUE);
+static struct bt_conn_cb conn_callbacks = {
+	.connected = connected,
+	.disconnected = disconnected,
+};
 
-  if (!red || !green || !blue) {
-    PRINT("Cannot find LED connected to pin 3 (red), 5 (green) and 6 (blue).\n");
-  }
+static void bt_ready(int err)
+{
+	if (err) {
+		printk("Bluetooth init failed (err %d)\n", err);
+		return;
+	}
 
-  tmp36 = device_get_binding(ADC_DEVICE_NAME);
-  if (!tmp36) {
-    PRINT("Cannot find the TMP36 connected to pin A0.\n");
-  }
+	printk("Bluetooth initialized\n");
 
-	nano_timer_init(&timer, data);
-	adc_enable(tmp36);
+	service_init();
 
-  while (1) {
-    pwm_pin_set_values(red, 1024, SLEEPTICKS, 0);
+	err = bt_le_adv_start(BT_LE_ADV(BT_LE_ADV_IND), ad, ARRAY_SIZE(ad),
+					sd, ARRAY_SIZE(sd));
+	if (err) {
+		printk("Advertising failed to start (err %d)\n", err);
+		return;
+	}
 
-    if (adc_read(tmp36, &table) == 0) {
-      uint32_t length = BUFFER_SIZE;
-      uint8_t *buf = buffer;
-      for (; length > 0; length -= 4, buf += 4) {
-		    uint32_t rawValue = *((uint32_t *) buf);
-        float voltage = (rawValue / 1024.0) * 5.0;
-        float celsius = (voltage - 0.5) * 100;
-        PRINT("Celsius %f\n", celsius);
-	    }
-    }
+	printk("Advertising successfully started\n");
+}
 
-    nano_timer_start(&timer, SLEEPTICKS);
-    nano_timer_test(&timer, TICKS_UNLIMITED);
-  }
+static void auth_cancel(struct bt_conn *conn)
+{
+	char addr[BT_ADDR_LE_STR_LEN];
 
-  adc_disable(tmp36);
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	printk("Pairing cancelled: %s\n", addr);
+}
+
+static struct bt_conn_auth_cb auth_cb_display = {
+	.cancel = auth_cancel,
+};
+
+#ifdef CONFIG_MICROKERNEL
+void mainloop(void)
+#else
+void main(void)
+#endif
+{
+	int err;
+
+	err = bt_enable(bt_ready);
+	if (err) {
+		printk("Bluetooth init failed (err %d)\n", err);
+		return;
+	}
+
+	bt_conn_cb_register(&conn_callbacks);
+	bt_conn_auth_cb_register(&auth_cb_display);
+
+	/* Implement notification. At the moment there is no suitable way
+	 * of starting delayed work so we do it here
+	 */
+	while (1) {
+		task_sleep(sys_clock_ticks_per_sec);
+
+		/* Battery level simulation */
+		service_notify();
+	}
 }
