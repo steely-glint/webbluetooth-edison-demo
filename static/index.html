@@ -173,6 +173,22 @@
     (function() {
       'use strict';
 
+      function toHexColor(colorStr) {
+        let a = document.createElement('div');
+        a.style.color = colorStr;
+
+        // Unknown color, let's try adding # in front.
+        if (a.style.color === "")
+          a.style.color = `#${colorStr}`;
+
+        let style = window.getComputedStyle(document.body.appendChild(a));
+        let colors = style.color.match(/\d+/g).map(a => parseInt(a, 10));
+
+        document.body.removeChild(a);
+
+        return new Uint8Array(colors);
+      }
+
       window.onload = () => {
         var app = document.querySelector('#app');
 
@@ -244,11 +260,9 @@
             return done();
           }
 
-          let encoder = new TextEncoder("utf-8");
           let value = document.querySelector('#color').value;
-          let encodedString = encoder.encode(value.toLowerCase());
 
-          return this.colorLedCharacteristic.writeValue(encodedString)
+          return this.colorLedCharacteristic.writeValue(toHexColor(value))
           .catch(err => { this.error(err); })
           .then(done);
         },
@@ -281,7 +295,11 @@
 
           this.$.connectBtn.disabled = true;
           navigator.bluetooth.requestDevice({
-            filters: [{ name: 'Edison' }],
+            filters: [
+              { name: 'Edison' },
+              { name: 'Zephyr' },
+              { name: 'Arduino101' }
+            ],
             optionalServices: [0xFC00]
           })
           .then(device => {

@@ -94,7 +94,7 @@ ColorCharacteristic.prototype.onReadRequest = function(offset, callback) {
 };
 
 ColorCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
-  var value = parse(data.toString('utf8')).hex;
+  var value = data.hexSlice();
   if (!value) {
     callback(this.RESULT_SUCCESS);
     return;
