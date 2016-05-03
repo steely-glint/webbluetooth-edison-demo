@@ -8,7 +8,6 @@ var board = new five.Board({
 var beacon = require("eddystone-beacon");
 var util = require('util');
 var bleno = require('eddystone-beacon/node_modules/bleno');
-var parse = require('parse-color');
 
 DEVICE_NAME = 'Edison';
 
@@ -82,29 +81,28 @@ var ColorCharacteristic = function() {
     properties: ['read', 'write'],
     value: null
   });
-  this._value = 'ffffff';
+  this._value = new Buffer([255, 255, 255]);
   this._led = null;
 };
 
 util.inherits(ColorCharacteristic, bleno.Characteristic);
 
 ColorCharacteristic.prototype.onReadRequest = function(offset, callback) {
-  var data = new Buffer(this._value);
-  callback(this.RESULT_SUCCESS, data);
+  callback(this.RESULT_SUCCESS, this._value);
 };
 
 ColorCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
-  var value = data.hexSlice();
+  var value = data;
   if (!value) {
     callback(this.RESULT_SUCCESS);
     return;
   }
 
   this._value = value;
-  console.log(value);
+  console.log(value.hexSlice());
 
   if (this._led) {
-    this._led.color(this._value);
+    this._led.color(this._value.hexSlice());
   }
   callback(this.RESULT_SUCCESS);
 };
@@ -173,6 +171,6 @@ board.on("ready", function() {
   });
 
   colorCharacteristic._led = led;
-  led.color(colorCharacteristic._value);
+  led.color(colorCharacteristic._value.hexSlice());
   led.intensity(30);
 });

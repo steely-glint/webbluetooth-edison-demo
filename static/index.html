@@ -189,6 +189,25 @@
         return new Uint8Array(colors);
       }
 
+      String.prototype.padStart = function (maxLength, fillString=' ') {
+        let str = String(this);
+        if (str.length >= maxLength) {
+          return str;
+        }
+
+        fillString = String(fillString);
+        if (fillString.length === 0) {
+          fillString = ' ';
+        }
+
+        let fillLen = maxLength - str.length;
+        let timesToRepeat = Math.ceil(fillLen / fillString.length);
+        let truncatedStringFiller = fillString
+          .repeat(timesToRepeat)
+          .slice(0, fillLen);
+        return truncatedStringFiller + str;
+      };
+
       window.onload = () => {
         var app = document.querySelector('#app');
 
@@ -243,9 +262,10 @@
           return this.colorLedCharacteristic.readValue()
           .then(function(data) {
              data = data.buffer ? data : new DataView(data);
-             let decoder = new TextDecoder("utf-8");
-             let decodedString = decoder.decode(data);
-             document.querySelector('#color').value = decodedString;
+             let r = data.getUint8(0).toString(16).padStart(2, '0');
+             let g = data.getUint8(1).toString(16).padStart(2, '0');
+             let b = data.getUint8(2).toString(16).padStart(2, '0');
+             document.querySelector('#color').value = "#" + r + g + b;
            });
         },
         writeLedColor: function() {
