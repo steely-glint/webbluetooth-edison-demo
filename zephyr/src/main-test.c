@@ -1,6 +1,5 @@
 #include <zephyr.h>
 #include <device.h>
-#include <pwm.h>
 #include <sys_clock.h>
 #include <misc/byteorder.h>
 #include <adc.h>
@@ -13,9 +12,7 @@
 #define PRINT           printk
 #endif
 
-#define IO3_RED   "PWM_0"
-#define IO5_GREEN "PWM_1"
-#define IO6_BLUE  "PWM_2"
+#define SLEEPTICKS  SECONDS(1)
 
 #define ADC_DEVICE_NAME "ADC_0"
 
@@ -29,7 +26,7 @@
  * A4 Channel 14
  */
 #define A0 10
-#define BUFFER_SIZE 40
+#define BUFFER_SIZE 4
 
 static uint8_t buffer[BUFFER_SIZE];
 
@@ -45,46 +42,46 @@ static struct adc_seq_table table = {
 	.num_entries = 1,
 };
 
-#define SLEEPTICKS  SECONDS(1)
+uint8_t tmp36_read(void)
+{
+    uint8_t *buf = buffer;
+
+    // ADC only works on ARC: https://www.zephyrproject.org/doc/board/arduino_101.html
+    // below two lines is testing code:
+    uint32_t *set = (uint32_t*) buf;
+    set[0] = 150;
+    //if (adc_read(tmp36, &table) == 0) {
+        uint32_t length = BUFFER_SIZE;
+        for (; length > 0; length -= 4, buf += 4) {
+            uint32_t rawValue = *((uint32_t *) buf);
+            printf("raw temperature value %d\n\n\n", rawValue);
+            float voltage = (rawValue / 1024.0) * 5.0;
+            float celsius = (voltage - 0.5) * 100;
+            return (uint8_t) celsius + 0.5;
+        }
+    //}
+    return 20;
+}
 
 void main(void)
 {
   struct nano_timer timer;
 	uint32_t data[2] = {0, 0};
 
-  struct device *red, *green, *blue, *tmp36;
+  struct device *tmp36;
 
   PRINT("Zephyr WebBluetooth demo\n");
 
-  red = device_get_binding(IO3_RED);
-  green = device_get_binding(IO5_GREEN);
-  blue = device_get_binding(IO6_BLUE);
-
-  if (!red || !green || !blue) {
-    PRINT("Cannot find LED connected to pin 3 (red), 5 (green) and 6 (blue).\n");
-  }
-
-  tmp36 = device_get_binding(ADC_DEVICE_NAME);
-  if (!tmp36) {
-    PRINT("Cannot find the TMP36 connected to pin A0.\n");
+  if ((tmp36 = device_get_binding(ADC_DEVICE_NAME)) == NULL) {
+      printk("device_get_binding: failed for ADC\n");
+      printk("Temperature (celsius): %d\n\n\n", tmp36_read());
   }
 
 	nano_timer_init(&timer, data);
 	adc_enable(tmp36);
 
   while (1) {
-    pwm_pin_set_values(red, 1024, SLEEPTICKS, 0);
-
-    if (adc_read(tmp36, &table) == 0) {
-      uint32_t length = BUFFER_SIZE;
-      uint8_t *buf = buffer;
-      for (; length > 0; length -= 4, buf += 4) {
-		    uint32_t rawValue = *((uint32_t *) buf);
-        float voltage = (rawValue / 1024.0) * 5.0;
-        float celsius = (voltage - 0.5) * 100;
-        PRINT("Celsius %f\n", celsius);
-	    }
-    }
+    tmp36_read();
 
     nano_timer_start(&timer, SLEEPTICKS);
     nano_timer_test(&timer, TICKS_UNLIMITED);
