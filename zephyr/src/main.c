@@ -35,12 +35,24 @@
 #define DEVICE_NAME			"Arduino101"
 #define DEVICE_NAME_LEN		(sizeof(DEVICE_NAME) - 1)
 
-struct bt_conn *default_conn;
-
+/*
+ * Set Advertisement data. Based on the Eddystone specification:
+ * https://github.com/google/eddystone/blob/master/protocol-specification.md
+ * https://github.com/google/eddystone/tree/master/eddystone-url
+ */
 static const struct bt_data ad[] = {
-	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0x00, 0xfc),
+	BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0xaa, 0xfe),
+	BT_DATA_BYTES(BT_DATA_SVC_DATA16,
+		      0xaa, 0xfe, /* Eddystone UUID */
+		      0x10, /* Eddystone-URL frame type */
+		      0x00, /* Calibrated Tx power at 0m */
+		      0x03, /* URL Scheme Prefix https://. */
+					'g', 'o', 'o', '.', 'g', 'l', '/',
+					'9', 'F', 'o', 'm', 'Q', 'C'),
+	BT_DATA_BYTES(BT_DATA_UUID16_ALL, 0x00, 0xfc)
 };
+
+struct bt_conn *default_conn;
 
 static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, DEVICE_NAME_LEN),
