@@ -159,7 +159,7 @@ void service_init(void)
     bt_gatt_register(attrs, ARRAY_SIZE(attrs));
 }
 
-void service_notify(void)
+void service_notify(struct bt_conn *conn)
 {
     if (!simulate_blvl) {
         return;
@@ -171,5 +171,5 @@ void service_notify(void)
         temperature = 20;
     }
 
-    bt_gatt_notify(NULL, &attrs[2], &temperature, sizeof(temperature));
+    bt_gatt_notify(conn, &attrs[2], &temperature, sizeof(temperature));
 }
