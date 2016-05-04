@@ -291,7 +291,7 @@
           let data = event.target.value;
           // In Chrome 50+, a DataView is returned instead of an ArrayBuffer.
           data = data.buffer ? data : new DataView(data);
-          let temperature = data.getFloat64(0, /*littleEndian=*/ true);
+          let temperature = data.getUint8(0);
           document.querySelector('#temp').innerHTML = temperature.toFixed(0);
 
           let date = (new Date()).toString().replace(/^.* (\d+:\d+:\d+).*$/, (match, p) => p);

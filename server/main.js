@@ -30,7 +30,7 @@ util.inherits(TemperatureCharacteristic, bleno.Characteristic);
 
 TemperatureCharacteristic.prototype.onReadRequest = function(offset, callback) {
   var data = new Buffer(8);
-  data.writeDoubleLE(this._lastValue, 0);
+  data.writeUInt8(this._lastValue);
   callback(this.RESULT_SUCCESS, data);
 };
 
@@ -68,7 +68,7 @@ TemperatureCharacteristic.prototype.valueChange = function(value) {
   console.log("Temperature change " + newValue);
 
   var data = new Buffer(8);
-  data.writeDoubleLE(newValue, 0);
+  data.writeUInt8(newValue);
 
   if (this._onChange) {
     this._onChange(data);
