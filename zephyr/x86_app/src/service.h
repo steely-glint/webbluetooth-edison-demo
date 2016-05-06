@@ -18,5 +18,5 @@
  * limitations under the License.
  */
 
-void service_init(void);
+void service_init(struct bt_conn *conn);
 void service_notify(struct bt_conn *conn);

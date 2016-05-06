@@ -92,7 +92,7 @@ static void bt_ready(int err)
 
 	printk("Bluetooth initialized\n");
 
-	service_init();
+	service_init(default_conn);
 
     err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad),
                             sd, ARRAY_SIZE(sd));
@@ -126,6 +126,8 @@ void main(void)
 {
 	int err;
 
+    printf("WebBluetooth demo running...");
+
 	err = bt_enable(bt_ready);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
@@ -140,8 +142,5 @@ void main(void)
 	 */
 	while (1) {
 		task_sleep(sys_clock_ticks_per_sec);
-
-		/* Battery level simulation */
-		service_notify(default_conn);
 	}
 }

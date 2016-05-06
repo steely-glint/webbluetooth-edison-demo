@@ -29,11 +29,16 @@
 #include <pwm.h>
 #include <adc.h>
 
+#include <ipm.h>
+#include <ipm/ipm_quark_se.h>
+
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/conn.h>
 #include <bluetooth/uuid.h>
 #include <bluetooth/gatt.h>
+
+QUARK_SE_IPM_DEFINE(temperature_ipm, 0, QUARK_SE_IPM_INBOUND);
 
 #define BT_UUID_WEBBT BT_UUID_DECLARE_16(0xfc00)
 
@@ -147,7 +152,15 @@ static struct bt_gatt_attr attrs[] = {
     BT_GATT_CUD(SENSOR_2_NAME, BT_GATT_PERM_READ),
 };
 
-void service_init(void)
+void temperature_ipm_callback(void *context, uint32_t id, volatile void *data)
+{
+    struct bt_conn *conn = (struct bt_conn *) context;
+    temperature = *(uint8_t*) data;
+    printk("Got temperature from ARC %d\n", temperature);
+    bt_gatt_notify(conn, &attrs[2], &temperature, sizeof(temperature));
+}
+
+void service_init(struct bt_conn *conn)
 {
     if ((pwm = device_get_binding("PWM")) == NULL)
         printk("device_get_binding: failed for PWM\n");
@@ -156,20 +169,11 @@ void service_init(void)
         printk("PWM init OK\n");
     }
 
+    struct device *ipm;
+
+    ipm = device_get_binding("temperature_ipm");
+    ipm_register_callback(ipm, temperature_ipm_callback, conn);
+    ipm_set_enabled(ipm, 1);
+
     bt_gatt_register(attrs, ARRAY_SIZE(attrs));
-}
-
-void service_notify(struct bt_conn *conn)
-{
-    if (!simulate_blvl) {
-        return;
-    }
-
-    temperature--;
-    if (!temperature) {
-        /* Software eco temperature charger */
-        temperature = 20;
-    }
-
-    bt_gatt_notify(conn, &attrs[2], &temperature, sizeof(temperature));
 }
