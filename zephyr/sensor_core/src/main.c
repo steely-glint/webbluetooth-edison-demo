@@ -77,7 +77,7 @@ uint8_t tmp36_read(void)
     for (; length > 0; length -= 4, buf += 4) {
         uint32_t rawValue = *((uint32_t *) buf);
         printk("Raw temperature value %d\n", rawValue);
-        float voltage = (rawValue / 512.0) * 5.0;
+        float voltage = (rawValue / 4096.0) * 3.3;
         float celsius = (voltage - 0.5) * 100;
         return (uint8_t) celsius + 0.5;
     }
