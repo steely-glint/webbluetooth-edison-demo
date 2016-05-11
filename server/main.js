@@ -174,3 +174,22 @@ board.on("ready", function() {
   led.color(colorCharacteristic._value.hexSlice());
   led.intensity(30);
 });
+
+try {
+  var nfc = require("node-webnfc");
+
+  nfc.init(_ => {
+    nfc.watch(message => {
+      var record = message.records[0];
+      if (record) {
+        // Expects color of css hex form, eg. "#ff00ff".
+        var color = record.data.name;
+        if (color) {
+          colorCharacteristic._led.color(color);
+        }
+      }
+    }, { mode: "any", recordType: "json" });
+  });
+} catch (err) {
+  console.log("NFC feature disabled.");
+}
