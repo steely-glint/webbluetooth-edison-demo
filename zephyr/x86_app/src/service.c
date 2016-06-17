@@ -38,9 +38,6 @@
 #include <bluetooth/uuid.h>
 #include <bluetooth/gatt.h>
 
-#include <gpio.h>
-#include <sys_clock.h>
-
 QUARK_SE_IPM_DEFINE(temperature_ipm, 0, QUARK_SE_IPM_INBOUND);
 
 #define BT_UUID_WEBBT BT_UUID_DECLARE_16(0xfc00)
@@ -53,32 +50,20 @@ QUARK_SE_IPM_DEFINE(temperature_ipm, 0, QUARK_SE_IPM_INBOUND);
 
 static struct bt_gatt_ccc_cfg  blvl_ccc_cfg[CONFIG_BLUETOOTH_MAX_PAIRED] = {};
 static uint8_t simulate_blvl;
-static uint8_t temperature = 20;
+static int32_t temperature = 0;
+static uint32_t humidity = 0;
 static uint8_t rgb[3] = {0xff, 0x00, 0x00}; // red
 
-struct device *pwm, *tmp36, *tmp2302;
+struct device *pwm;
 #define IO3_RED   0
 #define IO5_GREEN 1
 #define IO6_BLUE  2
 
 #define ADC_DEVICE_NAME "ADC_0"
 
-#define SLEEPTICKS      SECONDS(1)
 /* about 2 ms, thus 500Hz */
 #define PERIOD 64000
 #define MAX(a,b) (((a)>(b))?(a):(b))
-
-#if defined(CONFIG_GPIO_DW_0)
-#define GPIO_DRV_NAME CONFIG_GPIO_DW_0_NAME
-#elif defined(CONFIG_GPIO_QMSI_0)
-#define GPIO_DRV_NAME CONFIG_GPIO_QMSI_0_NAME
-#elif defined(CONFIG_GPIO_ATMEL_SAM3)
-#define GPIO_DRV_NAME CONFIG_GPIO_ATMEL_SAM3_PORTB_DEV_NAME
-#elif
-#define GPIO_DRV_NAME "GPIO_0"
-#endif
-
-#define IO8_AM2302 16
 
 uint32_t start_time;
 uint32_t stop_time;
@@ -174,145 +159,18 @@ static struct bt_gatt_attr attrs[] = {
 void temperature_ipm_callback(void *context, uint32_t id, volatile void *data)
 {
     struct bt_conn *conn = (struct bt_conn *) context;
-    temperature = *(uint8_t*) data;
-    printk("Got temperature from ARC %d\n", temperature);
-    bt_gatt_notify(conn, &attrs[2], &temperature, sizeof(temperature));
-}
 
-uint32_t measure_signal(uint32_t signal)
-{
-    uint32_t count = 1;
-
-    uint32_t readValue;
-
-    start_time = sys_cycle_get_32();
-
-    do {
-      gpio_pin_read(tmp2302, IO8_AM2302, &readValue);
-      if (count++ > 255) return -1;
-    } while (readValue == signal);
-
-    stop_time = sys_cycle_get_32();
-
-    cycles_spent = stop_time - start_time;
-    return SYS_CLOCK_HW_CYCLES_TO_NS(cycles_spent) / 1000; // Microseconds
-}
-
-int verifyResponse(uint32_t response)
-{
-    if (response >= 75 && response <= 85)
-        return 1;
-    return -1;
-}
-
-int verifyLowSignal(uint32_t low)
-{
-    if (low >= 48 && low <= 55)
-        return 1;
-    return -1;
-}
-
-int checkHighSignal(uint32_t high)
-{
-    if (high >= 68 && high <= 75)
-        return 1;
-    if (high >= 22 && high <= 30)
-        return 0;
-    return -1;
-}
-
-void read_am2302_tmp()
-{
-    uint32_t cycles[80];
-
-    gpio_pin_configure(tmp2302, IO8_AM2302, (GPIO_DIR_OUT));
-    gpio_pin_write(tmp2302, IO8_AM2302, 1);
-    task_sleep(USEC(1000));
-
-   // STEP 1+2
-
-   // We set MCU to output.
-   // Due to previous pullup, it should always be high.
-
-   // We signal the AM2302 to wake up, by signaling
-   // low for min 800us, but typically 1ms. (max 20ms).
-   gpio_pin_write(tmp2302, IO8_AM2302, 0);
-   task_sleep(USEC(1000));
-
-   // End the start signal by setting data line high for 40 microseconds.
-   gpio_pin_write(tmp2302, IO8_AM2302, 1);
-   task_sleep(USEC(40));
-
-   // Then set MCU to input and release the bus
-   // Due to pullup, it will go high and it will take
-   // at least 20us, though typically 30ns and
-   // max 200ns for the AM2302 to signal low.
-   gpio_pin_configure(tmp2302, IO8_AM2302, (GPIO_DIR_IN));
-   task_sleep(USEC(10));
-
-   // Signal from AM2302 that it is ready to send data.
-
-   uint32_t time;
-
-   time = measure_signal(0);
-   if (verifyResponse(time) < 0)
-       printk("Response low time not within limits: %d\n", time);
-   time = measure_signal(1);
-   if (verifyResponse(time) < 0)
-       printk("Response high time not within limits: %d\n", time);
-
-   // Read data.
-   for (int i = 0; i < 80; i += 2) {
-       cycles[i] = measure_signal(0);
-       cycles[i+1] = measure_signal(1);
-   }
-
-   // -- Timing critical code is now over. --
-
-   uint8_t dataset[5];
-
-   // Each data set is 5 bytes (5 * 8 = 40)
-   for (int i = 0; i < 40; ++i) {
-       uint32_t low = cycles[2*i];
-       uint32_t high = cycles[2*i+1];
-
-       dataset[i/8] <<= 1; // Move existing value one bit.
-
-       int lowstate = verifyLowSignal(low);
-       int highstate = checkHighSignal(high);
-
-       if (highstate == 1)
-           dataset[i/8] |= 1;
-
-       if (lowstate < 0 || highstate < 0) printk("X: "); else printk("%d: ", highstate);
-       printk("low"); if (lowstate < 0) printk("*"); printk("\t: %d\t/\t", low);
-       printk("high"); if (highstate < 0) printk("*"); printk("\t: %d\n", high);
-       if ((i + 1) % 8 == 0) printk("\n");
+    switch(id) {
+      case 1:
+        temperature = *(int32_t*) data;
+        printk("Got temperature from ARC %d\n", temperature);
+        bt_gatt_notify(conn, &attrs[2], &temperature, sizeof(temperature));
+        break;
+      case 2:
+        humidity = *(uint32_t*) data;
+        printk("Got humidity from ARC %d\n", humidity);
+        break;
     }
-
-    // Debugging:
-    for (int j = 0; j < 5; j++){
-        printk("%d ", dataset[j]);
-    }
-    printk("\n");
-
-    // Checksum check:
-    if (dataset[4] != ((dataset[0] + dataset[1] + dataset[2] + dataset[3]) & 0xFF)) {
-        printk("Checksum failed!\n");
-    }
-
-    float humidity = (float) (dataset[0] << 8 | dataset[1]) / 10.0;
-    printk("Humidity: %f \n", humidity);
-    float temperature;
-
-    int neg = dataset[2] & 0x80; // higtest bit only.
-    dataset[2] &= 0x7F; // Remove highest bit.
-
-    temperature = (float) (dataset[2] << 8 | dataset[3]) / 10.0;
-    if (neg > 0)
-        temperature *= -1;
-
-    printk("Temperature: %f \n", temperature);
 }
 
 void service_init(struct bt_conn *conn)
@@ -331,10 +189,4 @@ void service_init(struct bt_conn *conn)
     ipm_set_enabled(ipm, 1);
 
     bt_gatt_register(attrs, ARRAY_SIZE(attrs));
-
-    if((tmp2302 = device_get_binding(GPIO_DRV_NAME)) == NULL)
-        printk("device_get_binding: failed for TMP2302\n");
-    else {
-        read_am2302_tmp();
-    }
 }

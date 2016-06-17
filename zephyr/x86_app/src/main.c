@@ -126,9 +126,12 @@ void main(void)
 {
 	int err;
 
-    printf("WebBluetooth demo running...");
+  printf("WebBluetooth demo running...\n");
+
+  service_init(0);
 
 	err = bt_enable(bt_ready);
+
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 		return;
