@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Web Bluetooth demo (Edison)</title>
+    <title>Thermostat and LED control (Web Bluetooth)</title>
     <script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
     <link rel="import" href="bower_components/polymer/polymer.html">
     <link rel="import" href="bower_components/paper-button/paper-button.html">
@@ -21,6 +21,10 @@
         overflow: hidden;
       }
     </style>
+
+    <!-- Origin Trial Token, feature = Web Bluetooth, origin = https://edison-webbt.appspot.com, expires = 2016-09-07 -->
+    <meta http-equiv="origin-trial" content="Aiy5b7S2+FCLy5WGf9A5aGnCIfc7MsW+tCrnRBJBgeK3ioSrawC/shHL84lFTGe1lWffWxMNrN3S+wtKeIPuLwwAAABjeyJvcmlnaW4iOiAiaHR0cHM6Ly9lZGlzb24td2ViYnQuYXBwc3BvdC5jb206NDQzIiwgImZlYXR1cmUiOiAiV2ViQmx1ZXRvb3RoIiwgImV4cGlyeSI6IDE0NzMyNTg1NjJ9" />
+
   </head>
 
   <dom-module id="main-app">
@@ -133,10 +137,10 @@
     </style>
       <div id="main">
         <div style="margin: 10px;">
-           Web Bluetooth (Intel&reg; Edison) demo
+           Thermostat and LED control (Web Bluetooth demo)
           <br></br>
           <div id="temperature">
-            Temperature is <span id="temp">N/A</span>&deg; celcius
+            Temperature is <span id="temp">N/A</span>&deg; Celsius
           </div>
           <div id="update">(not updated yet)</div>
           <br></br>

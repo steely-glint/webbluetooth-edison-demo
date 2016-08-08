@@ -1,8 +1,4 @@
 {
-  "/bower_components/webcomponentsjs/webcomponents-lite.js": {
-    "weight": 1,
-    "type": "script"
-  },
   "/bower_components/platinum-sw/platinum-sw-register.html": {
     "weight": 1,
     "type": "document"
@@ -40,10 +36,6 @@
     "type": "document"
   },
   "/bower_components/iron-overlay-behavior/iron-overlay-behavior.html": {
-    "weight": 1,
-    "type": "document"
-  },
-  "/bower_components/iron-a11y-announcer/iron-a11y-announcer.html": {
     "weight": 1,
     "type": "document"
   },
@@ -104,6 +96,10 @@
     "type": "document"
   },
   "/bower_components/iron-validatable-behavior/iron-validatable-behavior.html": {
+    "weight": 1,
+    "type": "document"
+  },
+  "/bower_components/iron-a11y-announcer/iron-a11y-announcer.html": {
     "weight": 1,
     "type": "document"
   },

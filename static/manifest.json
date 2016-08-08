@@ -1,6 +1,6 @@
 {
-  "name": "WebBluetooth Edison Demo",
-  "short_name": "WebBT Edison",
+  "name": "Thermostat and LED control (Web Bluetooth)",
+  "short_name": "Thermo+LED",
   "icons": [
       {
         "src": "images/48.png",
