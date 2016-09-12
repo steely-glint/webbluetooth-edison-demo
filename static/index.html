@@ -5,7 +5,7 @@
     <script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
     <link rel="import" href="bower_components/polymer/polymer.html">
     <link rel="import" href="bower_components/paper-button/paper-button.html">
-    <link rel="import" href="bower_components/paper-input/paper-input.html">
+    <link rel="import" href="bower_components/paper-color-picker/paper-color-input.html">
     <link rel="import" href="bower_components/paper-spinner/paper-spinner.html">
     <link rel="import" href="bower_components/paper-toast/paper-toast.html">
     <link rel="import" href="bower_components/iron-list/iron-list.html">
@@ -57,9 +57,14 @@
         flex: auto;
         font-family: monospace;
         font-size: 8pt;
+        @apply(--layout-horizontal);
       }
       .consoleLine:first-of-type {
         border-top: none !important;
+      }
+      .consoleLine .consoleColor {
+        width: 20px;
+        height: 20px;
       }
 
       .error:last-child {
@@ -144,17 +149,18 @@
           </div>
           <div id="update">(not updated yet)</div>
           <br></br>
-          <paper-input label="LED color" placeholder="Type color name here" id="color" class="flex"></paper-input>
-          <div class="horizontal layout end-justified">
-            <paper-button id="submit" on-click="writeLedColor">Submit</paper-button>
-          </div>
+          <paper-color-input shape="circle" type="hsv" label="LED light color"
+            id="color" class="flex"></paper-color-input>
         </div>
         <br></br>
         <div id="console" class="flex">
           <iron-list class="messages" items="[[consoleLines]]" as="item">
             <template>
               <div class$="consoleLine [[item.type]]">
-                [[item.value]]
+                <div class="flex">[[item.value]]</div>
+                <template is="dom-if" if="[[item.color]]">
+                  <div class="consoleColor" style="[[item.color]]"></div>
+                </template>
               </div>
             </template>
           </iron-list>
@@ -187,6 +193,7 @@
 
         let style = window.getComputedStyle(document.body.appendChild(a));
         let colors = style.color.match(/\d+/g).map(a => parseInt(a, 10));
+        console.log("Translated to hex color " + JSON.stringify(colors));
 
         document.body.removeChild(a);
 
@@ -253,8 +260,10 @@
         computeButtonTitle: function(server) {
           return server ? "Disconnect" : "Connect";
         },
-        log: function(text) {
-          this.push('consoleLines', { value: text, type: "log" });
+        log: function(text, hexColor) {
+          if (hexColor)
+            hexColor = "background: " + hexColor + ";";
+          this.push('consoleLines', { value: text, type: "log", color: hexColor });
         },
         error: function(text) {
           this.push('consoleLines', { value: text, type: "error" });
@@ -263,31 +272,43 @@
           this.consoleLines = [];
         },
         readLedColor: function() {
-          return this.colorLedCharacteristic.readValue()
-          .then(function(data) {
+          if (!this.colorLedCharacteristic)
+            return Promise.resolve();
+
+          return this.colorLedCharacteristic.readValue().then(data => {
              data = data.buffer ? data : new DataView(data);
              let r = data.getUint8(0).toString(16).padStart(2, '0');
              let g = data.getUint8(1).toString(16).padStart(2, '0');
              let b = data.getUint8(2).toString(16).padStart(2, '0');
-             document.querySelector('#color').value = "#" + r + g + b;
+
+             // Ignore events from changing the color.
+             this.reading = true;
+             let value = "#" + r + g + b;
+             this.log("Received LED color: " + value, value);
+             document.querySelector('#color').valueAsHex = value;
+             this.reading = false;
            });
         },
-        writeLedColor: function() {
-          this.$.submit.style.backgroundColor = "#646FB7";
+        writeLedColor: function(hexValue) {
+          if (this.writing || this.reading)
+            return;
+
+          this.writing = true;
 
           let done = () => {
-            this.$.submit.style.backgroundColor = "#303F9F";
+            this.writing = false;
             this.readLedColor();
           }
 
           if (!this.colorLedCharacteristic) {
-            this.error("Error: No Color Characteristic found.")
+            this.error("Error: No Color Characteristic found.");
             return done();
           }
 
-          let value = document.querySelector('#color').value;
+          let value = toHexColor(hexValue);
+          this.log("Sending LED color: " + hexValue, hexValue);
 
-          return this.colorLedCharacteristic.writeValue(toHexColor(value))
+          return this.colorLedCharacteristic.writeValue(value)
           .catch(err => { this.error(err); })
           .then(done);
         },
@@ -388,9 +409,11 @@
           });
         },
         ready: function() {
-          document.querySelector('#color').addEventListener('keydown', ev => {
-            if (ev.keyCode === 13)
-              this.writeLedColor();
+          let picker = document.querySelector('#color');
+          picker.addEventListener('value-changed', ev => {
+              let hexValue = picker.valueAsHex;
+              if (hexValue)
+                this.writeLedColor(hexValue);
           });
         }
       });

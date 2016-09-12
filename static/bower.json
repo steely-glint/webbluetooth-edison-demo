@@ -23,6 +23,7 @@
     "iron-list": "polymerelements/iron-list#~1.2.7",
     "paper-spinner": "polymerelements/paper-spinner#~1.1.1",
     "platinum-sw": "polymerelements/platinum-sw#~1.2.3",
-    "paper-toast": "polymerelements/paper-toast#~1.2.1"
+    "paper-toast": "polymerelements/paper-toast#~1.2.1",
+    "paper-color-picker": "~0.9.2"
   }
 }
