@@ -14,9 +14,9 @@ Shape and colour spaces
 ---
 There are three different main configurations all 3 elements allow: `circle`, `square`
  or `huebox`. This is called the `[shape]` of the color circle. Additionally in the case of `circle` and `square` it can
-  be specified whether the colours should be generated from the `hsv` or `hsl` colour space.
+	be specified whether the colours should be generated from the `hsv` or `hsl` colour space.
 
-    <paper-color-input shape="square" type="hsl"></paper-color-input>
+		<paper-color-input shape="square" type="hsl"></paper-color-input>
 
 
 @demo demo/index.html
@@ -198,38 +198,47 @@ There are three different main configurations all 3 elements allow: `circle`, `s
 			_isValueDefined: function(){
 				return this.value.red >= 0 && this.value.green >= 0 && this.value.blue >= 0;
 			},
-            _padStart: function(str, maxLength, fillString=' ') {
-                if (str.length >= maxLength) {
-                  return str;
-                }
+			_padStart: function(str, maxLength, fillString=' ') {
+				if (str.length >= maxLength) {
+					return str;
+				}
 
-                fillString = String(fillString);
-                if (fillString.length === 0) {
-                  fillString = ' ';
-                }
+				fillString = String(fillString);
+				if (fillString.length === 0) {
+					fillString = ' ';
+				}
 
-                let fillLen = maxLength - str.length;
-                let timesToRepeat = Math.ceil(fillLen / fillString.length);
-                let truncatedStringFiller = fillString
-                  .repeat(timesToRepeat)
-                  .slice(0, fillLen);
-                return truncatedStringFiller + str;
-            },
+				let fillLen = maxLength - str.length;
+				let timesToRepeat = Math.ceil(fillLen / fillString.length);
+				let truncatedStringFiller = fillString
+					.repeat(timesToRepeat)
+					.slice(0, fillLen);
+				return truncatedStringFiller + str;
+			},
 			_setValueAsHexFromValue: function(){
 				if(this._isValueDefined()){
 					var hex = '#';
 					var value = this.value;
-                    ['red', 'green', 'blue'].forEach(c => {
+					['red', 'green', 'blue'].forEach(c => {
 						var h = value[c].toString(16);
 						hex += this._padStart(h, 2, '0');
 					});
-					this.set('valueAsHex', hex);
-                    console.log("Setting hex from value: " + hex);
+
+					// As we listen to value.* this function gets called
+					// 3 times when this.value is changed.
+					if (this.valueAsHex === hex)
+						return;
+
+					// Don't trigger _setValueFromHex
+					this.valueAsHex = hex;
+
+					let json = JSON.stringify(this.value);
+					console.log(`_setValueAsHexFromValue: ${json} -> ${hex}`);
 				}
 			},
 			_setValueFromHex: function(){
 				var hex = this.valueAsHex;
-                console.log("hex " + hex);
+				
 				var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
 				var hex = hex.replace(shorthandRegex, function(m, r, g, b) {
 					return r + r + g + g + b + b;
@@ -239,9 +248,17 @@ There are three different main configurations all 3 elements allow: `circle`, `s
 				if(typeof this.value === 'undefined'){
 					this.set('value', {});
 				}
-				this.set('value.red', parseInt(result[1], 16));
-				this.set('value.green', parseInt(result[2], 16));
-				this.set('value.blue', parseInt(result[3], 16));
+
+				let red = parseInt(result[1], 16);
+				let green = parseInt(result[2], 16);
+				let blue = parseInt(result[3], 16);
+
+				// Don't trigger _setValueAsHexFromValue.
+				// Only emit value-change once!
+				this.value = { red: red, green: green, blue: blue };
+
+				let json = JSON.stringify(this.value);
+				console.log(`_setValueFromHex: ${this.valueAsHex} -> ${hex} -> ${json}`);
 			}
 		});
 	</script>
