@@ -193,7 +193,7 @@
 
         let style = window.getComputedStyle(document.body.appendChild(a));
         let colors = style.color.match(/\d+/g).map(a => parseInt(a, 10));
-        console.log("Translated to hex color " + JSON.stringify(colors));
+        console.log("toUint8ArrayFromHexColor " + JSON.stringify(colors));
 
         document.body.removeChild(a);
 
@@ -410,10 +410,16 @@
         },
         ready: function() {
           let picker = document.querySelector('#color');
+          // We get a value-changed per color component changed.
+          let lastValue = undefined;
           picker.addEventListener('value-changed', ev => {
-              let hexValue = picker.valueAsHex;
-              if (hexValue)
-                this.writeLedColor(hexValue);
+              // HACK: Ensure the value is uptodate, as we listen to
+              // value-change and not /valueAsHex/-change.
+              picker._setValueAsHexFromValue();
+              if (!picker.valueAsHex || picker.valueAsHex === lastValue)
+                return;
+              lastValue = picker.valueAsHex;
+              this.writeLedColor(lastValue);
           });
         }
       });

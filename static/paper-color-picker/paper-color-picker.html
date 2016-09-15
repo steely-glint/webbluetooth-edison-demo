@@ -7,7 +7,7 @@ Material Design: Color picker inspired by <a href="http://www.google.com/design/
 Example:
 
     <paper-color-picker id="picker"></paper-color-picker>
-    
+
 and to open the dialog
 
     this.$.picker.open();
@@ -28,7 +28,7 @@ and to open the dialog
 
 <style>
   html /deep/ .color-picker-dialog::shadow #scroller {
-    
+
     padding:0px;
   }
 </style>
@@ -38,22 +38,17 @@ and to open the dialog
       width:200px;
       height:200px;
     }
-    
+
     #container {
       margin-top: 0px;
       padding: 0px;
-      /*position:absolute;
-      left:0px;
-      top:0px;
-      right:0px;
-      bottom:0px;*/
     }
-    
+
     #preview {
       padding: 0px;
       position: relative;
     }
-    
+
     paper-slider {
       width:100%;
     }
@@ -113,9 +108,6 @@ and to open the dialog
 
       background-size:24px 24px;
       background-position:0 0, 0px 0px, 12px 12px, 12px 12px;
-    }
-    :host([advanced]) {
-
     }
     .buttons{
       margin-top:20px;
@@ -190,7 +182,7 @@ and to open the dialog
   </style>
   <template>
 
-  <paper-dialog id="dialog" 
+  <paper-dialog id="dialog"
                 entry-animation="scale-up-animation"
                 exit-animation="fade-out-animation"
                 with-backdrop
@@ -261,25 +253,6 @@ and to open the dialog
 </template>
   <script>
     (function(){
-      var colorNamesRetrieved = new Whenever();
-      var retrievingColorNames = false;
-      var retrieveColorNames = function(el){
-        if(!retrievingColorNames){
-          var httpRequest = new XMLHttpRequest();
-          httpRequest.onreadystatechange = function(){
-            if (httpRequest.readyState === XMLHttpRequest.DONE) {
-              if (httpRequest.status === 200) {
-                colorNamesRetrieved.ready(JSON.parse(httpRequest.responseText));
-              }
-            }
-          };
-          httpRequest.open('GET', el.resolveUrl('./color-names.json'));
-          httpRequest.send();
-        }
-        retrievingColorNames = true;
-        return colorNamesRetrieved;
-      };
-
       Polymer({
         is: 'paper-color-picker',
         properties: {
@@ -409,7 +382,6 @@ and to open the dialog
           }
           if(!this.noFullNames){
             this.set('noFullNames', false);
-            retrieveColorNames(this);
           }
           this.async(function(){
             if(this._isColorDefined()){
@@ -466,41 +438,62 @@ and to open the dialog
           this.setColorWheel();
         },
         _calculateLuminance: function(r, g, b){
-          var a = [r,g,b].map(function(v) {
+          var a = [r,g,b].map(v => {
             v /= 255;
-            return (v <= 0.03928) ?
-            v / 12.92 :
-                    Math.pow( ((v+0.055)/1.055), 2.4 );
+            return (v <= 0.03928) ? v / 12.92 : Math.pow((v+0.055) / 1.055, 2.4);
           });
           return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
         },
+        _fetchColorMap: function() {
+          if (this._colorMap)
+            return Promise.resolve(this._colorMap);
+          return fetch(this.resolveUrl('./color-names.json')).then(response => {
+            this._colorMap = response.json();
+            return this._colorMap;
+          });
+        },
+        findClosestColor: function(color) {
+          return this._fetchColorMap().then(colors => {
+            let closest = {
+              color: undefined,
+              distance: Infinity
+            };
+            colors.forEach(color => {
+              let distance = Math.sqrt(
+                Math.pow(this.immediateColor['red'] - color.rgb[0], 2) +
+                Math.pow(this.immediateColor['green'] - color.rgb[1], 2) +
+                Math.pow(this.immediateColor['blue'] - color.rgb[2], 2)
+              );
+              if (distance < closest.distance) {
+                closest.color = color;
+                closest.distance = distance;
+              }
+            });
+            return closest.color;
+          });
+        },
         immediateColorChanged: function(){
-          if(typeof this.immediateColor.alpha == 'undefined'){
+          if (typeof this.immediateColor.alpha == 'undefined'){
             this.immediateColor.alpha = 1;
           }
           this.$.color.style.backgroundColor = 'rgba(' + this.immediateColor['red'] + ',' + this.immediateColor['green'] + ',' + this.immediateColor['blue'] + ',' + this.immediateColor['alpha'] + ')';
-          if(!this.noFullNames){
-            colorNamesRetrieved.whenReady(function(colors){
-              var closest = {
-                color: undefined,
-                distance: Infinity
-              };
-              colors.forEach((color) => {
-                var distance = Math.sqrt(Math.pow(this.immediateColor['red']-color.rgb[0],2)+Math.pow(this.immediateColor['green']-color.rgb[1],2)+Math.pow(this.immediateColor['blue']-color.rgb[2],2));
-                if(distance < closest.distance){
-                  closest.color = color;
-                  closest.distance = distance;
-                }
-              });
-              this.immediateColorAsString = closest.color.title;
 
-              var luminance = Math.max(this._calculateLuminance.apply(this, closest.color.rgb), Math.min(1,1-this.immediateColor.alpha+0.2));
+          if (!this.noFullNames) {
+            this.findClosestColor(this.immediateColor).then(color => {
+              this.immediateColorAsString = color.title;
+
+              // TODO: For Sakari, make option later.
+              this.immediateColor['red'] = color.rgb[0];
+              this.immediateColor['green'] = color.rgb[1];
+              this.immediateColor['blue'] = color.rgb[2];
+
+              var luminance = Math.max(this._calculateLuminance.apply(this, color.rgb), Math.min(1, 1 - this.immediateColor.alpha + 0.2));
               //shy: ­
               var opacity = Math.max(0,luminance -.5) *1.8;
               opacity = Math.round(opacity*100)/100;
               this.$.title.style.textShadow = 'rgba(0,0,0,'+ opacity +') 1px 0 60px';
               //this.$.title.style.opacity = luminance < 0.6 ? .9 : 0.5;
-            }.bind(this));
+            });
           }
           //var maxZ = Math.max.bind(Math, 0);
           //this.$.title.style.backgroundColor = 'rgb(' + maxZ(this.immediateColor['red'] - 40) + ',' + maxZ(this.immediateColor['green'] - 40) + ',' + maxZ(this.immediateColor['blue'] - 40) + ')';
@@ -537,12 +530,15 @@ and to open the dialog
           this.set('immediateColor', colors);
         },
         setColor: function(){
-          this.set('color.red', this.immediateColor.red);
-          this.set('color.green', this.immediateColor.green);
-          this.set('color.blue', this.immediateColor.blue);
-          this.set('color.alpha', this.immediateColor.alpha);
+          let color = {
+            red: this.immediateColor.red,
+            green: this.immediateColor.green,
+            blue: this.immediateColor.blue,
+            alpha: this.immediateColor.alpha
+          };
+          console.log("set color "+ JSON.stringify(color));
+          this.set('color', color);
           this.set('colorAsString', this.immediateColorAsString);
-          console.log("set color "+ JSON.stringify(this.color));
         },
         open: function(){
           if (this.color && this.color['green'])
