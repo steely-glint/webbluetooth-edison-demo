@@ -312,11 +312,21 @@
           .catch(err => { this.error(err); })
           .then(done);
         },
+        readTemperature: function() {
+          if (!this.temperatureCharacteristic)
+            return Promise.resolve();
+
+          return this.temperatureCharacteristic.readValue().then(data => {
+            let temperature = data.getUint8(0);
+            this.updateTemperature(temperature);
+          });
+        },
         onTemperatureChange: function(event) {
           let data = event.target.value;
-          // In Chrome 50+, a DataView is returned instead of an ArrayBuffer.
-          data = data.buffer ? data : new DataView(data);
           let temperature = data.getUint8(0);
+          this.updateTemperature(temperature);
+        },
+        updateTemperature: function(temperature) { 
           document.querySelector('#temp').innerHTML = temperature.toFixed(0);
 
           let date = (new Date()).toString().replace(/^.* (\d+:\d+:\d+).*$/, (match, p) => p);
@@ -383,11 +393,15 @@
 
             let p2 = () => service.getCharacteristic(0xFC0A)
               .then(characteristic => {
-                this.log("Got Temperature characteristics.")
-                characteristic.addEventListener('characteristicvaluechanged',
-                  this.onTemperatureChange);
+                this.log("Got Temperature characteristics.");
+                this.temperatureCharacteristic = characteristic;
+                this.temperatureCharacteristic.addEventListener('characteristicvaluechanged',
+                  this.onTemperatureChange.bind(this));
+
                 this.log("Attempting to start Temperature notifications...");
-                return characteristic.startNotifications();
+                return this.readTemperature().then(
+                  this.temperatureCharacteristic.startNotifications()
+                );
               });
 
             return p1().then(p2);

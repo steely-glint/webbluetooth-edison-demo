@@ -23,7 +23,6 @@ and to open the dialog
 <link href="../bower_components/paper-input/paper-input-container.html" rel="import">
 <link href="../bower_components/neon-animation/animations/fade-out-animation.html" rel="import">
 <link href="../bower_components/neon-animation/animations/scale-up-animation.html" rel="import">
-<script src="../bower_components/whenever.js/whenever.js"></script>
 <link href="paper-color-circle.html" rel="import">
 
 <style>
@@ -458,14 +457,14 @@ and to open the dialog
               color: undefined,
               distance: Infinity
             };
-            colors.forEach(color => {
+            colors.forEach(colorEntry => {
               let distance = Math.sqrt(
-                Math.pow(this.immediateColor['red'] - color.rgb[0], 2) +
-                Math.pow(this.immediateColor['green'] - color.rgb[1], 2) +
-                Math.pow(this.immediateColor['blue'] - color.rgb[2], 2)
+                Math.pow(color['red'] - colorEntry.rgb[0], 2) +
+                Math.pow(color['green'] - colorEntry.rgb[1], 2) +
+                Math.pow(color['blue'] - colorEntry.rgb[2], 2)
               );
               if (distance < closest.distance) {
-                closest.color = color;
+                closest.color = colorEntry;
                 closest.distance = distance;
               }
             });
