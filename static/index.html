@@ -232,22 +232,10 @@
       Polymer({
         is: 'main-app',
         properties: {
-          server: {
-            type: Object,
-            notify: true,
-            value: false
-          },
-          colorLedCharacteristic: {
-            type: Object,
-            value: null
-          },
-          temperatureCharacteristic: {
-            type: Object,
-            value: null
-          },
           buttonTitle: {
             type: String,
-            computed: 'computeButtonTitle(server)'
+            notify: true,
+            value: "Connect"
           },
           consoleLines: {
             type: Array,
@@ -257,8 +245,23 @@
             }
           }
         },
-        computeButtonTitle: function(server) {
-          return server ? "Disconnect" : "Connect";
+        ready: function() {
+          this.bluetoothDevice = null;
+          this.colorLEDCharacteristic = null;
+          this.temperatureCharacteristic = null;
+
+          let picker = document.querySelector('#color');
+          // We get a value-changed per color component changed.
+          let lastValue = undefined;
+          picker.addEventListener('value-changed', ev => {
+              // HACK: Ensure the value is uptodate, as we listen to
+              // value-change and not /valueAsHex/-change.
+              picker._setValueAsHexFromValue();
+              if (!picker.valueAsHex || picker.valueAsHex === lastValue)
+                return;
+              lastValue = picker.valueAsHex;
+              this.writeLedColor(lastValue);
+          });
         },
         log: function(text, hexColor) {
           if (hexColor)
@@ -272,10 +275,10 @@
           this.consoleLines = [];
         },
         readLedColor: function() {
-          if (!this.colorLedCharacteristic)
+          if (!this.colorLEDCharacteristic)
             return Promise.resolve();
 
-          return this.colorLedCharacteristic.readValue().then(data => {
+          return this.colorLEDCharacteristic.readValue().then(data => {
              data = data.buffer ? data : new DataView(data);
              let r = data.getUint8(0).toString(16).padStart(2, '0');
              let g = data.getUint8(1).toString(16).padStart(2, '0');
@@ -300,7 +303,7 @@
             this.readLedColor();
           }
 
-          if (!this.colorLedCharacteristic) {
+          if (!this.colorLEDCharacteristic) {
             this.error("Error: No Color Characteristic found.");
             return done();
           }
@@ -308,7 +311,7 @@
           let value = toHexColor(hexValue);
           this.log("Sending LED color: " + hexValue, hexValue);
 
-          return this.colorLedCharacteristic.writeValue(value)
+          return this.colorLEDCharacteristic.writeValue(value)
           .catch(err => { this.error(err); })
           .then(done);
         },
@@ -333,85 +336,99 @@
           document.querySelector('#update').innerHTML = `(Last Updated: ${date})`;
         },
         onConnectBtnClick() {
-          if (this.server) {
-            this.server.disconnect();
-            // .disconnect() currently doesn't result in firing
-            // 'gattserverdisconnected', so duplicate the work here.
-            this.server = null;
-            this.$.spinner.active = false;
-          } else {
-            this.connect();
+          switch(this.buttonTitle) {
+            case "Connect":
+              if (this.bluetoothDevice) {
+                this.error("Internal: Bluetooth device already exists.");
+              }
+              // Fall through
+            case "Reconnect":
+              this.connect();
+              break;
+            case "Disconnect":
+              if (!this.bluetoothDevice && !this.bluetoothDevice.gatt) {
+                this.error("Internal: No Bluetooth device or connection exists.");
+              }
+              this.bluetoothDevice.gatt.disconnect();
+              break;
+            default:
+              this.error("Internal: Wrong buttonTitle state!");
           }
         },
-        connect: function() {
-          this.clear();
-          this.$.spinner.active = true;
+        onGATTDisconnected: function() {
+          this.buttonTitle = "Reconnect";
+          this.$.spinner.active = false;
+        },
+        requestDevice: function() {
+          if (this.bluetoothDevice) {
+            this.log('Attempting to reconnect...')
+            return Promise.resolve(this.bluetoothDevice);
+          }
 
-          this.log("Requesting device...");
-
-          this.$.connectBtn.disabled = true;
-          navigator.bluetooth.requestDevice({
+          this.log('Requesting Bluetooth Device...');
+          return navigator.bluetooth.requestDevice({
             filters: [
               { name: 'Edison' },
               { name: 'Zephyr' },
               { name: 'Arduino101' }
             ],
             optionalServices: [0xFC00]
-          })
-          .then(device => {
-            this.$.connectBtn.disabled = false;
+          }).then(device => {
+            this.bluetoothDevice = device;
+            device.addEventListener('gattserverdisconnected',
+              this.onGATTDisconnected.bind(this));
+            return device;
+          });
+        },
+        fetchColorLEDCharc(service) {
+          return service.getCharacteristic(0xFC0B).then(charc => {
+            this.log("Got color characteristics.");
+            this.colorLEDCharacteristic = charc;
+            return this.readLedColor();
+          });
+        },
+        fetchTemperatureCharc(service) {
+          return service.getCharacteristic(0xFC0A).then(charc => {
+            this.log("Got temperature characteristics.");
+            this.temperatureCharacteristic = charc;
+            this.temperatureCharacteristic.addEventListener(
+              'characteristicvaluechanged', this.onTemperatureChange.bind(this));
+
+            this.log("Starting temperature notifications.");
+            return this.readTemperature().then(
+              this.temperatureCharacteristic.startNotifications()
+            );
+          });
+        },
+        connect: function() {
+          this.clear();
+          this.$.spinner.active = true;
+
+          this.$.connectBtn.disabled = true;
+
+          this.requestDevice().then(device => {
             this.log("Connecting to GATT server...");
-
-            if (device.addEventListener) {
-              device.addEventListener('gattserverdisconnected', () => {
-                this.server = null;
-                this.$.spinner.active = false;
-              });
-            }
-
-            return device.gatt ? device.gatt.connect() : device.connectGATT();
+            return device.gatt.connect();
           })
           .then(server => {
-            this.server = server;
-            this.log("Connection established.");
-            return new Promise(resolve => {
-              this.async(() => {
-                this.log("Requesting primary service...");
-                resolve(server.getPrimaryService(0xFC00));
-              }, 2000);
-            });
+            this.log("Requesting primary service...");
+            return server.getPrimaryService(0xFC00);
           })
           .then(service => {
             this.log("Requesting characteristics...");
 
-            let p1 = () => service.getCharacteristic(0xFC0B)
-              .then(characteristic => {
-                this.log("Got Color characteristics.");
-                this.colorLedCharacteristic = characteristic;
-                return this.readLedColor();
-              });
-
-            let p2 = () => service.getCharacteristic(0xFC0A)
-              .then(characteristic => {
-                this.log("Got Temperature characteristics.");
-                this.temperatureCharacteristic = characteristic;
-                this.temperatureCharacteristic.addEventListener('characteristicvaluechanged',
-                  this.onTemperatureChange.bind(this));
-
-                this.log("Attempting to start Temperature notifications...");
-                return this.readTemperature().then(
-                  this.temperatureCharacteristic.startNotifications()
-                );
-              });
-
-            return p1().then(p2);
+            return this.fetchColorLEDCharc(service)
+              .then(this.fetchTemperatureCharc(service));
           })
-          .then(() => {
+          .then(_ => {
+            this.buttonTitle = "Disconnect";
+            this.$.connectBtn.disabled = false;
             this.log("Connection fully established.");
           })
           .catch(err => {
+            this.buttonTitle = "Connect"; // Don't attempt reconnect
+            this.bluetoothDevice = null;
             this.error(err);
-            this.server = null;
             // Work around desktop click on disconnect, triggering error
             // and enabling to connect with the same click.
             this.async(() => {
@@ -420,20 +437,6 @@
           })
           .then(() => {
             this.$.spinner.active = false;
-          });
-        },
-        ready: function() {
-          let picker = document.querySelector('#color');
-          // We get a value-changed per color component changed.
-          let lastValue = undefined;
-          picker.addEventListener('value-changed', ev => {
-              // HACK: Ensure the value is uptodate, as we listen to
-              // value-change and not /valueAsHex/-change.
-              picker._setValueAsHexFromValue();
-              if (!picker.valueAsHex || picker.valueAsHex === lastValue)
-                return;
-              lastValue = picker.valueAsHex;
-              this.writeLedColor(lastValue);
           });
         }
       });
