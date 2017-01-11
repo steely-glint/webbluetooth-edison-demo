@@ -1,118 +1,55 @@
-var five = require("johnny-five");
-var Edison = require("edison-io");
-var board = new five.Board({
-  repl: false,
-  io: new Edison()
-});
-
 var beacon = require("eddystone-beacon");
 var util = require('util');
-var bleno = require('eddystone-beacon/node_modules/bleno');
+var bleno = require('bleno');
 
 DEVICE_NAME = 'Edison';
 
 process.env['BLENO_DEVICE_NAME'] = DEVICE_NAME;
 
-var TemperatureCharacteristic = function() {
+var FingerprintCharacteristic = function() {
   bleno.Characteristic.call(this, {
     uuid: 'fc0a',
-    properties: ['read', 'notify'],
+    properties: ['read'],
     value: null
   });
+  this._value = new Buffer([0x89,0x88,0x07,0x3b,0x0c,0x73,0x02,0x5c,0x23,0x26,0xbb,0xbe,0x06,0xcd,0x71,0xfc,0x9f,0x3c,0xe3,0x5c,0x68,0xc5,0x25,0xec,0x28,0x57,0x22,0x1b,0x19,0x83,0x8f]);
 
-  this._lastValue = 0;
-  this._total = 0;
-  this._samples = 0;
-  this._onChange = null;
 };
 
-util.inherits(TemperatureCharacteristic, bleno.Characteristic);
+util.inherits(FingerprintCharacteristic, bleno.Characteristic);
 
-TemperatureCharacteristic.prototype.onReadRequest = function(offset, callback) {
-  var data = new Buffer(8);
-  data.writeUInt8(this._lastValue);
-  callback(this.RESULT_SUCCESS, data);
-};
+FingerprintCharacteristic.prototype.onReadRequest = function(offset, callback) {
+  console.log('reading fingerprint');
 
-TemperatureCharacteristic.prototype.onSubscribe = function(maxValueSize, updateValueCallback) {
-  console.log("Subscribed to temperature change.");
-  this._onChange = updateValueCallback;
-  this._lastValue = undefined;
-};
-
-TemperatureCharacteristic.prototype.onUnsubscribe = function() {
-  console.log("Unsubscribed to temperature change.");
-  this._onChange = null;
-};
-
-var NO_SAMPLES = 100;
-
-TemperatureCharacteristic.prototype.valueChange = function(value) {
-  this._total += value;
-  this._samples++;
-
-  if (this._samples < NO_SAMPLES) {
-    return;
-  }
-
-  var newValue = Math.round(this._total / NO_SAMPLES);
-
-  this._total = 0;
-  this._samples = 0;
-
-  if (this._lastValue && Math.abs(this._lastValue - newValue) < 1) {
-    return;
-  }
-
-  this._lastValue = newValue;
-  console.log("Temperature change " + newValue);
-
-  var data = new Buffer(8);
-  data.writeUInt8(newValue);
-
-  if (this._onChange) {
-    this._onChange(data);
-  }
-};
-
-var ColorCharacteristic = function() {
-  bleno.Characteristic.call(this, {
-    uuid: 'fc0b',
-    properties: ['read', 'write'],
-    value: null
-  });
-  this._value = new Buffer([255, 255, 255]);
-  this._led = null;
-};
-
-util.inherits(ColorCharacteristic, bleno.Characteristic);
-
-ColorCharacteristic.prototype.onReadRequest = function(offset, callback) {
   callback(this.RESULT_SUCCESS, this._value);
 };
 
-ColorCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
-  var value = data;
-  if (!value) {
-    callback(this.RESULT_SUCCESS);
-    return;
-  }
 
-  this._value = value;
-  console.log(value.hexSlice());
-
-  if (this._led) {
-    this._led.color(this._value.hexSlice());
-  }
-  callback(this.RESULT_SUCCESS);
+var NonceCharacteristic = function() {
+  bleno.Characteristic.call(this, {
+    uuid: 'fc0b',
+    properties: ['read'],
+    value: null
+  });
+  this._value = new Buffer([0xff,0xfe,0xfd,0xfb,0xfa,0xf9,0xf8,0xf7,0xf6,0xf5,0xf4,0xf3,0xf2,0xf1,0xf0]);
 };
+
+util.inherits(NonceCharacteristic, bleno.Characteristic);
+
+NonceCharacteristic.prototype.onReadRequest = function(offset, callback) {
+  console.log('reading Nonce');
+
+  callback(this.RESULT_SUCCESS, this._value);
+};
+
+console.log("waiting for bleno");
 
 bleno.on('stateChange', function(state) {
   console.log(state);
 
   if (state === 'poweredOn') {
     bleno.startAdvertising(DEVICE_NAME, ['fc00']);
-    beacon.advertiseUrl("https://goo.gl/9FomQC", {name: DEVICE_NAME});
+    beacon.advertiseUrl("https://pi.pe/iot/bl.html", {name: DEVICE_NAME});
   } else {
     if (state === 'unsupported'){
       console.log("BLE and Bleno configurations not enabled on board");
@@ -121,8 +58,9 @@ bleno.on('stateChange', function(state) {
   }
 });
 
-var temperatureCharacteristic = new TemperatureCharacteristic();
-var colorCharacteristic = new ColorCharacteristic();
+var fingerprintCharacteristic = new FingerprintCharacteristic();
+var nonceCharacteristic = new NonceCharacteristic();
+
 
 bleno.on('advertisingStart', function(error) {
   console.log('advertisingStart: ' + (error ? error : 'success'));
@@ -130,13 +68,14 @@ bleno.on('advertisingStart', function(error) {
   if (error) {
     return;
   }
+  console.log('setting service');
 
   bleno.setServices([
     new bleno.PrimaryService({
       uuid: 'fc00',
       characteristics: [
-        temperatureCharacteristic,
-        colorCharacteristic
+        fingerprintCharacteristic,
+        nonceCharacteristic
       ]
     })
   ]);
@@ -150,46 +89,6 @@ bleno.on('disconnect', function(clientAddress) {
   console.log("Disconnected Connection: " + clientAddress);
 });
 
-board.on("ready", function() {
-  // Johnny-Five's Led.RGB class can be initialized with
-  // an array of pin numbers in R, G, B order.
-  // Reference: http://johnny-five.io/api/led.rgb/#parameters
-  var led = new five.Led.RGB([ 3, 5, 6 ]);
 
-  // Johnny-Five's Thermometer class provides a built-in
-  // controller definition for the TMP36 sensor. The controller
-  // handles computing a celsius (also fahrenheit & kelvin) from
-  // a raw analog input value.
-  // Reference: http://johnny-five.io/api/thermometer/
-  var temp = new five.Thermometer({
-    controller: "TMP36",
-    pin: "A0",
-  });
 
-  temp.on("change", function() {
-    temperatureCharacteristic.valueChange(this.celsius);
-  });
 
-  colorCharacteristic._led = led;
-  led.color(colorCharacteristic._value.hexSlice());
-  led.intensity(30);
-});
-
-try {
-  var nfc = require("node-webnfc");
-
-  nfc.init(_ => {
-    nfc.watch(message => {
-      var record = message.records[0];
-      if (record) {
-        // Expects color of css hex form, eg. "#ff00ff".
-        var color = record.data.name;
-        if (color) {
-          colorCharacteristic._led.color(color);
-        }
-      }
-    }, { mode: "any", recordType: "json" });
-  });
-} catch (err) {
-  console.log("NFC feature disabled.");
-}

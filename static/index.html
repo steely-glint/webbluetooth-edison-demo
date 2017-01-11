@@ -1,345 +1,31 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Thermostat and LED control (Web Bluetooth)</title>
-    <script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
-    <link rel="import" href="bower_components/polymer/polymer.html">
-    <link rel="import" href="bower_components/paper-button/paper-button.html">
-    <link rel="import" href="paper-color-picker/paper-color-input.html">
-    <link rel="import" href="bower_components/paper-spinner/paper-spinner.html">
-    <link rel="import" href="bower_components/paper-toast/paper-toast.html">
-    <link rel="import" href="bower_components/iron-list/iron-list.html">
-    <link rel="import" href="bower_components/iron-flex-layout/iron-flex-layout-classes.html">
-    <link rel="import" href="bower_components/platinum-sw/platinum-sw-cache.html">
-    <link rel="import" href="bower_components/platinum-sw/platinum-sw-register.html">
-    <meta name="viewport" content="width=device-width">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#FF4081">
-    <style>
-      body {
-        margin: 0px;
-        overflow: hidden;
-      }
-    </style>
-
-    <!-- Origin Trial Token, feature = Web Bluetooth, origin = https://edison-webbt.appspot.com, expires = 2016-09-07 -->
-    <meta http-equiv="origin-trial" content="Aiy5b7S2+FCLy5WGf9A5aGnCIfc7MsW+tCrnRBJBgeK3ioSrawC/shHL84lFTGe1lWffWxMNrN3S+wtKeIPuLwwAAABjeyJvcmlnaW4iOiAiaHR0cHM6Ly9lZGlzb24td2ViYnQuYXBwc3BvdC5jb206NDQzIiwgImZlYXR1cmUiOiAiV2ViQmx1ZXRvb3RoIiwgImV4cGlyeSI6IDE0NzMyNTg1NjJ9" />
-
+    <title>Bluetooth supported pairing</title>
   </head>
 
-  <dom-module id="main-app">
-  <template>
-    <style is="custom-style" include="iron-flex iron-flex-alignment">
-      :host {
-        display: block;
-        box-sizing: border-box;
-        height: 100vh;
-        width: 100vw;
-        background-color: #fafafa;
-        @apply(--paper-font-body1);
-        @apply(--vertical-layout);
-      }
 
-      .messages {
-        flex: 1 1;
-        overflow-y: scroll;
-        word-wrap: break-word;
-        -webkit-user-select: text;
-        border-top: 1px solid rgb(230, 230, 230);
-        -webkit-transform: translateZ(0);
-      }
-
-      .consoleLine {
-        padding: 1px 22px 1px 24px;
-        border-top: 1px solid rgb(230, 230, 230);
-        min-height: 20px;
-        line-height: 20px;
-        flex: auto;
-        font-family: monospace;
-        font-size: 8pt;
-        @apply(--layout-horizontal);
-      }
-      .consoleLine:first-of-type {
-        border-top: none !important;
-      }
-      .consoleLine .consoleColor {
-        width: 20px;
-        height: 20px;
-      }
-
-      .error:last-child {
-        border-bottom: 1px solid #ffd7d7;
-      }
-      .log:last-child {
-        border-bottom: 1px solid rgb(230, 230, 230);
-      }
-      .error + :not(.error) {
-        border-top: 1px solid #ffd7d7;
-      }
-      .error {
-        background-color: #fff0f0;
-        border-top: 1px solid #ffd7d7 !important;
-        color: red !important;
-      }
-      .log {
-        background-color: white;
-      }
-
-      #temperature {
-        @apply(--paper-font-title);
-      }
-
-      #temperature span {
-        color: #FF4081;
-      }
-
-      #update {
-        color: #727272;
-      }
-
-      paper-button {
-        background-color: #303F9F;
-        color: white;
-      }
-
-      .clearBtn {
-        position: relative;
-        @apply(--layout-horizontal);
-        @apply(--layout-end-justified);
-      }
-
-      .clearBtn paper-button {
-        background-color: transparent;
-        color: black;
-        height: 52px;
-      }
-
-      connectBtn {
-        background-color: white;
-      }
-
-      .centered {
-        margin: 10px;
-        @apply(--layout-fit);
-        @apply(--layout-horizontal);
-        @apply(--layout-center-justified);
-      }
-
-      #main {
-        overflow: scroll;
-        -webkit-overflow-scrolling: touch;
-        height: calc(100vh - 60px);
-      }
-
-      #panel {
-        padding: 10px;
-        border-top: 1px solid rgb(230, 230, 230);
-        background-color: #303F9F;
-        @apply(--layout-horizontal);
-        @apply(--layout-end-justified);
-      }
-
-    </style>
-      <div id="main">
-        <div style="margin: 10px;">
-           Thermostat and LED control (Web Bluetooth demo)
-          <br></br>
-          <div id="temperature">
-            Temperature is <span id="temp">N/A</span>&deg; Celsius
-          </div>
-          <div id="update">(not updated yet)</div>
-          <br></br>
-          <paper-color-input shape="circle" type="hsv" label="LED light color"
-            id="color" class="flex"></paper-color-input>
-        </div>
-        <br></br>
-        <div id="console" class="flex">
-          <iron-list class="messages" items="[[consoleLines]]" as="item">
-            <template>
-              <div class$="consoleLine [[item.type]]">
-                <div class="flex">[[item.value]]</div>
-                <template is="dom-if" if="[[item.color]]">
-                  <div class="consoleColor" style="[[item.color]]"></div>
-                </template>
-              </div>
-            </template>
-          </iron-list>
-          <div class="clearBtn">
-            <div class="centered">
-              <paper-spinner id="spinner"></paper-spinner>
-            </div>
-            <template is="dom-if" if="[[consoleLines.length]]">
-              <paper-button on-click="clear" noink>Clear</paper-button>
-            </template>
-          </div>
-        </div>
-      </div>
-      <div id="panel">
-        <paper-button id="connectBtn" on-click="onConnectBtnClick">[[buttonTitle]]</paper-button>
-      </div>
-  </template>
+ <body>
+ Bluetooth....
+ <button onclick="onConnectBtnClick()">Connect</button>
+ </body>
 
   <script>
-    (function() {
-      'use strict';
+    var serviceUuid = parseInt("0xFC00");
 
-      function toHexColor(colorStr) {
-        let a = document.createElement('div');
-        a.style.color = colorStr;
-
-        // Unknown color, let's try adding # in front.
-        if (a.style.color === "")
-          a.style.color = `#${colorStr}`;
-
-        let style = window.getComputedStyle(document.body.appendChild(a));
-        let colors = style.color.match(/\d+/g).map(a => parseInt(a, 10));
-        console.log("toUint8ArrayFromHexColor " + JSON.stringify(colors));
-
-        document.body.removeChild(a);
-
-        return new Uint8Array(colors);
-      }
-
-      String.prototype.padStart = function (maxLength, fillString=' ') {
-        let str = String(this);
-        if (str.length >= maxLength) {
-          return str;
-        }
-
-        fillString = String(fillString);
-        if (fillString.length === 0) {
-          fillString = ' ';
-        }
-
-        let fillLen = maxLength - str.length;
-        let timesToRepeat = Math.ceil(fillLen / fillString.length);
-        let truncatedStringFiller = fillString
-          .repeat(timesToRepeat)
-          .slice(0, fillLen);
-        return truncatedStringFiller + str;
-      };
-
-      window.onload = () => {
-        var app = document.querySelector('#app');
-
-        app.displayInstalledToast = function() {
-          if (!document.querySelector('platinum-sw-cache').disabled) {
-            document.querySelector('#caching-complete').show();
-          }
-        };
-      }
-
-      Polymer({
-        is: 'main-app',
-        properties: {
-          buttonTitle: {
-            type: String,
-            notify: true,
-            value: "Connect"
-          },
-          consoleLines: {
-            type: Array,
-            notify: true,
-            value: function() {
-              return [];
-            }
-          }
-        },
-        ready: function() {
+      window.onload = function(){
+        this.buttonTitle = "Connect";
           this.bluetoothDevice = null;
           this.colorLEDCharacteristic = null;
           this.temperatureCharacteristic = null;
+        };
 
-          let picker = document.querySelector('#color');
-          // We get a value-changed per color component changed.
-          let lastValue = undefined;
-          picker.addEventListener('value-changed', ev => {
-              // HACK: Ensure the value is uptodate, as we listen to
-              // value-change and not /valueAsHex/-change.
-              picker._setValueAsHexFromValue();
-              if (!picker.valueAsHex || picker.valueAsHex === lastValue)
-                return;
-              lastValue = picker.valueAsHex;
-              this.writeLedColor(lastValue);
-          });
-        },
-        log: function(text, hexColor) {
-          if (hexColor)
-            hexColor = "background: " + hexColor + ";";
-          this.push('consoleLines', { value: text, type: "log", color: hexColor });
-        },
-        error: function(text) {
-          this.push('consoleLines', { value: text, type: "error" });
-        },
-        clear: function() {
-          this.consoleLines = [];
-        },
-        readLedColor: function() {
-          if (!this.colorLEDCharacteristic)
-            return Promise.resolve();
 
-          return this.colorLEDCharacteristic.readValue().then(data => {
-             data = data.buffer ? data : new DataView(data);
-             let r = data.getUint8(0).toString(16).padStart(2, '0');
-             let g = data.getUint8(1).toString(16).padStart(2, '0');
-             let b = data.getUint8(2).toString(16).padStart(2, '0');
-
-             // Ignore events from changing the color.
-             this.reading = true;
-             let value = "#" + r + g + b;
-             this.log("Received LED color: " + value, value);
-             document.querySelector('#color').valueAsHex = value;
-             this.reading = false;
-           });
-        },
-        writeLedColor: function(hexValue) {
-          if (this.writing || this.reading)
-            return;
-
-          this.writing = true;
-
-          let done = () => {
-            this.writing = false;
-            this.readLedColor();
-          }
-
-          if (!this.colorLEDCharacteristic) {
-            this.error("Error: No Color Characteristic found.");
-            return done();
-          }
-
-          let value = toHexColor(hexValue);
-          this.log("Sending LED color: " + hexValue, hexValue);
-
-          return this.colorLEDCharacteristic.writeValue(value)
-          .catch(err => { this.error(err); })
-          .then(done);
-        },
-        readTemperature: function() {
-          if (!this.temperatureCharacteristic)
-            return Promise.resolve();
-
-          return this.temperatureCharacteristic.readValue().then(data => {
-            let temperature = data.getUint8(0);
-            this.updateTemperature(temperature);
-          });
-        },
-        onTemperatureChange: function(event) {
-          let data = event.target.value;
-          let temperature = data.getUint8(0);
-          this.updateTemperature(temperature);
-        },
-        updateTemperature: function(temperature) { 
-          document.querySelector('#temp').innerHTML = temperature.toFixed(0);
-
-          let date = (new Date()).toString().replace(/^.* (\d+:\d+:\d+).*$/, (match, p) => p);
-          document.querySelector('#update').innerHTML = `(Last Updated: ${date})`;
-        },
-        onConnectBtnClick() {
+        function onConnectBtnClick() {
           switch(this.buttonTitle) {
             case "Connect":
               if (this.bluetoothDevice) {
-                this.error("Internal: Bluetooth device already exists.");
+                console.log("Internal: Bluetooth device already exists.");
               }
               // Fall through
             case "Reconnect":
@@ -347,118 +33,86 @@
               break;
             case "Disconnect":
               if (!this.bluetoothDevice && !this.bluetoothDevice.gatt) {
-                this.error("Internal: No Bluetooth device or connection exists.");
+                console.log("Internal: No Bluetooth device or connection exists.");
               }
               this.bluetoothDevice.gatt.disconnect();
               break;
             default:
-              this.error("Internal: Wrong buttonTitle state!");
+              console.log("Internal: Wrong buttonTitle state!");
           }
-        },
-        onGATTDisconnected: function() {
+        };
+
+        var onGATTDisconnected=  function() {
           this.buttonTitle = "Reconnect";
-          this.$.spinner.active = false;
-        },
-        requestDevice: function() {
+        }
+        var requestDevice= function() {
           if (this.bluetoothDevice) {
-            this.log('Attempting to reconnect...')
+            console.log('Attempting to reconnect...')
             return Promise.resolve(this.bluetoothDevice);
           }
 
-          this.log('Requesting Bluetooth Device...');
+          console.log('Requesting Bluetooth Device...');
           return navigator.bluetooth.requestDevice({
             filters: [
               { name: 'Edison' },
-              { name: 'Zephyr' },
-              { name: 'Arduino101' }
+              {services: [serviceUuid]}
             ],
-            optionalServices: [0xFC00]
           }).then(device => {
             this.bluetoothDevice = device;
+            console.log('Got Bluetooth Device...');
+
             device.addEventListener('gattserverdisconnected',
               this.onGATTDisconnected.bind(this));
             return device;
           });
-        },
-        fetchColorLEDCharc(service) {
+        };
+
+        function fetchColorLEDCharc(service) {
+          console.log("request color characteristics.");
+
           return service.getCharacteristic(0xFC0B).then(charc => {
-            this.log("Got color characteristics.");
+            console.log("Got color characteristics.");
             this.colorLEDCharacteristic = charc;
-            return this.readLedColor();
+            return;
           });
-        },
-        fetchTemperatureCharc(service) {
+        };
+
+        function fetchTemperatureCharc(service) {
+          console.log("request temp characteristics.");
+
           return service.getCharacteristic(0xFC0A).then(charc => {
-            this.log("Got temperature characteristics.");
+            console.log("Got temperature characteristics.");
             this.temperatureCharacteristic = charc;
-            this.temperatureCharacteristic.addEventListener(
-              'characteristicvaluechanged', this.onTemperatureChange.bind(this));
-
-            this.log("Starting temperature notifications.");
-            return this.readTemperature().then(
-              this.temperatureCharacteristic.startNotifications()
-            );
           });
-        },
-        connect: function() {
-          this.clear();
-          this.$.spinner.active = true;
+        };
 
-          this.$.connectBtn.disabled = true;
-
+        var connect= function() {
           this.requestDevice().then(device => {
-            this.log("Connecting to GATT server...");
+            console.log("Connecting to GATT server...");
             return device.gatt.connect();
           })
           .then(server => {
-            this.log("Requesting primary service...");
-            return server.getPrimaryService(0xFC00);
+            console.log("Requesting primary service...");
+            return server.getPrimaryService(serviceUuid);
           })
           .then(service => {
-            this.log("Requesting characteristics...");
+            console.log("Requesting characteristics...");
 
             return this.fetchColorLEDCharc(service)
               .then(this.fetchTemperatureCharc(service));
           })
           .then(_ => {
-            this.buttonTitle = "Disconnect";
-            this.$.connectBtn.disabled = false;
-            this.log("Connection fully established.");
+            console.log("Connection fully established.");
           })
           .catch(err => {
-            this.buttonTitle = "Connect"; // Don't attempt reconnect
             this.bluetoothDevice = null;
-            this.error(err);
-            // Work around desktop click on disconnect, triggering error
-            // and enabling to connect with the same click.
-            this.async(() => {
-              this.$.connectBtn.disabled = false;
-            }, 500);
+            console.log(err);
+
           })
-          .then(() => {
-            this.$.spinner.active = false;
-          });
+
         }
-      });
-    })();
+
+
   </script>
-</dom-module>
 
-  <body unresolved fullbleed>
-    <main-app></main-app>
-
-    <template is="dom-bind" id="app">
-      <paper-toast id="caching-complete"
-          duration="6000"
-          text="This app will work offline.">
-      </paper-toast>
-      <platinum-sw-register auto-register
-          on-service-worker-installed="displayInstalledToast">
-        <platinum-sw-cache
-            default-cache-strategy="fastest"
-             cache-config-file="cache-config.json"
-        ></platinum-sw-cache>
-      </platinum-sw-register>
-    </template>
-  </body>
 </html>
