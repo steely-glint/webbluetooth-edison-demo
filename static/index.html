@@ -11,13 +11,14 @@
  </body>
 
   <script>
-    var serviceUuid = parseInt("0xFC00");
+    var serviceUuid = parseInt("0x919E");
 
       window.onload = function(){
         this.buttonTitle = "Connect";
           this.bluetoothDevice = null;
-          this.colorLEDCharacteristic = null;
-          this.temperatureCharacteristic = null;
+          this.fpa = null;
+          this.fpb = null;
+          this.nonce = null;
         };
 
 
@@ -54,7 +55,7 @@
           console.log('Requesting Bluetooth Device...');
           return navigator.bluetooth.requestDevice({
             filters: [
-              { name: 'Edison' },
+              { name: 'Pipe' },
               {services: [serviceUuid]}
             ],
           }).then(device => {
@@ -67,24 +68,15 @@
           });
         };
 
-        function fetchColorLEDCharc(service) {
-          console.log("request color characteristics.");
+        function fetchCh(uuid,service) {
+          console.log("request "+uuid+" characteristics.");
 
-          return service.getCharacteristic(0xFC0B).then(charc => {
-            console.log("Got color characteristics.");
-            this.colorLEDCharacteristic = charc;
+          return service.getCharacteristic(uuid).then(charc => {
+            console.log("Got characteristics."+charc);
             return;
           });
         };
 
-        function fetchTemperatureCharc(service) {
-          console.log("request temp characteristics.");
-
-          return service.getCharacteristic(0xFC0A).then(charc => {
-            console.log("Got temperature characteristics.");
-            this.temperatureCharacteristic = charc;
-          });
-        };
 
         var connect= function() {
           this.requestDevice().then(device => {
@@ -97,9 +89,9 @@
           })
           .then(service => {
             console.log("Requesting characteristics...");
-
-            return this.fetchColorLEDCharc(service)
-              .then(this.fetchTemperatureCharc(service));
+            return this.fetchCh(0xFC0A,service)
+              .then(this.fetchCh(0xFC0B,service))
+                    .then(this.fetchCh(0xFC0C,service));
           })
           .then(_ => {
             console.log("Connection fully established.");
